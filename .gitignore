@@ -1,0 +1,5 @@
+.DS_Store
+local/config
+terraform/terraform.tfvars
+terraform/.terraform/
+terraform/.terraform*

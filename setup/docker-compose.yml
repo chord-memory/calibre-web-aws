@@ -1,0 +1,39 @@
+services:
+  caddy:
+    image: caddy:latest
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - /srv/cweb-setup/Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - calibre-web
+      - flask
+    restart: unless-stopped
+
+  calibre-web:
+    image: lscr.io/linuxserver/calibre-web:latest
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+    volumes:
+      - /srv/config:/config
+      - /srv/library:/books
+    ports:
+      - 8083:8083
+    restart: unless-stopped
+
+  flask:
+    build: /srv/cweb-setup/api
+    ports:
+      - 5000:5000
+    environment:
+      - FLASK_DEBUG=0
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:

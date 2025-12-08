@@ -1,0 +1,13 @@
+services:
+  calibre-web:
+    image: lscr.io/linuxserver/calibre-web:latest
+    environment:
+      - PUID=501  # uid in `id` output on Mac
+      - PGID=20   # gid in `id` output on Mac
+      - TZ=America/Chicago
+    volumes:
+      - ./config:/config
+      - ~/calibre-library:/books
+    ports:
+      - 8083:8083
+    restart: unless-stopped
