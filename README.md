@@ -9,7 +9,7 @@ While the Calibre-Web instance runs in an EC2 instance in AWS, it needs access t
 If you want to experiment with Calibre-Web locally before deploying to AWS.
 
 <details>
-  <summary>See local deployment details.</summary><br>
+  <summary>See local deployment details:</summary><br>
 
   Requires docker and docker-compose. For Mac, simply install Docker Desktop from the docker website [here](https://docs.docker.com/desktop/setup/install/mac-install/).
 
@@ -39,7 +39,7 @@ The basic AWS setup steps are:
 * Login with admin user to CLI
 
 <details>
-  <summary>See AWS setup details.</summary><br>
+  <summary>See AWS setup details:</summary><br>
 
   Requires the AWS CLI. Install using [Homebrew](https://brew.sh/):
   ```
@@ -134,6 +134,7 @@ terraform --version
 Generate a `terraform.tfvars` file in `terraform` with the following variables:
 ```
 domain_name    = "cweb.my-domain.net"
+profile        = "jordan-sso"
 hosted_zone_id = "ZXXXXXXXXXXXXX"
 admin_pass     = "CHANGEME"
 admin_email    = "you@example.com"
@@ -143,15 +144,32 @@ While logged into the AWS CLI, deploy resources with the commands:
 ```
 cd terraform
 terraform init
+terraform validate
+terraform plan
 terraform apply
 ```
+
+<details>
+  <summary>Troubleshooting notes:</summary><br>
+  
+  Requires the AWS CLI Session Manager plugin. Install using [Homebrew](https://brew.sh/):
+  ```
+  brew update
+  brew install session-manager-plugin
+  session-manager-plugin --version
+  ```
+  * SSH into the EC2 via `aws ssm start-session --target i-xxxxxxxx`
+  * Generated user_data file in the EC2 at `/var/lib/cloud/instances/i-xxxxxxxx/user-data.txt`
+  * Logs of the user_data script at `/var/log/cloud-init-output.log`
+  * View block device attachments via `sudo lsblk` or `sudo fdisk -l`
+</details>
 
 ## Kobo Sync Setup
 
 Once your Calibre-Web instance is running in AWS via the Terraform deployment described above, we can configure Kobo Sync.
 
 <details>
-  <summary>If configuring Kobo Sync with a local Calibre-Web instance, see attached details.</summary><br>
+  <summary>If configuring Kobo Sync with a local Calibre-Web instance, see attached details:</summary><br>
 
   Note:
   * You must visit your Calibre-Web instance at your Macs public IP
@@ -167,6 +185,7 @@ Once your Calibre-Web instance is running in AWS via the Terraform deployment de
   * If your Calibre-Web UI appears in the browser on your phone then the Kobo Sync should work
 </details><br>
 
+Steps:
 * In Calibre Web > Admin > Edit Basic Configuration > Feature Configuration, check "Enable Kobo Sync"
 * Under the user profile "admin", click Create/View under Kobo Sync Token
 * A popup with a value in the format `api_endpoint=https://example.com/kobo/xxxxxxxxxxxxxxxx` appears
@@ -178,7 +197,7 @@ Books from Calibre-Web and will be synced to Kobo when "Sync Now" is clicked and
 If you care about the progress % being synced from Kobo up to Calibre-Web, you can follow the steps below to ensure the % is being synced.
 
 <details>
-  <summary>Reading % sync for Calibre-Web running locally.</summary><br>
+  <summary>Reading % sync for Calibre-Web running locally:</summary><br>
 
   Use `sqlite3 local/config/app.db` to view the progress % changing for books added to the Kobo via Calibre-Web:
   ```
@@ -210,7 +229,7 @@ If you care about the progress % being synced from Kobo up to Calibre-Web, you c
 </details>
 
 <details>
-  <summary>Reading % sync for Calibre-Web running in AWS.</summary><br>
+  <summary>Reading % sync for Calibre-Web running in AWS:</summary><br>
   You can SSH into the EC2 via `aws ssm start-session --target i-xxxxxxxx` and view the database as referened by the local Calibre-Web steps.
   Or use the provided API endpoints // TODO
 </details><br>
@@ -239,6 +258,13 @@ Note that any sideloaded books synced from Calibre desktop will be duplicated. S
 * When [this PR](https://github.com/janeczku/calibre-web/pull/3381) is merged then book metadata & cover can be edited in Calibre desktop followed by aws s3/ebs sync and "Sync Now" on Kobo
 
 ## Manually Sync Calibre Desktop & Calibre-Web
+
+Requires the AWS CLI Session Manager plugin. Install using [Homebrew](https://brew.sh/):
+```
+brew update
+brew install session-manager-plugin
+session-manager-plugin --version
+```
 
 When edits are made to Calibre Desktop such as new ePubs added or Annotations synced to it, these changes may be synced to Calibre-Web by running the following commands:
 ```

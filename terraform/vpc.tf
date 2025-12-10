@@ -3,9 +3,22 @@ resource "aws_vpc" "main" {
   tags = { Name = "calibre-vpc" }
 }
 
+data "aws_ec2_instance_type_offerings" "t3_micro" {
+  location_type = "availability-zone"
+  filter {
+    name   = "instance-type"
+    values = ["t3.micro"]
+  }
+}
+
+resource "terraform_data" "t3_micro_az" {
+  input = sort(data.aws_ec2_instance_type_offerings.t3_micro.locations)[0]  # first AZ that supports t3.micro
+}
+
 resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.main.id
   cidr_block              = "10.0.1.0/24"
+  availability_zone       = terraform_data.t3_micro_az.output
   map_public_ip_on_launch = true
   tags = { Name = "calibre-public-subnet" }
 }

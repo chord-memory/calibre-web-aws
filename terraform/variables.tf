@@ -8,6 +8,11 @@ variable "region" {
   type        = string
 }
 
+variable "profile" {
+  description = "AWS SSO profile name for authed user"
+  type        = string
+}
+
 variable "hosted_zone_id" {
   description = "Route53 hosted zone ID for chord-memory.net"
   type        = string
@@ -25,16 +30,6 @@ variable "library_bucket_name" {
 
 variable "setup_bucket_name" {
   default = "cweb-setup"
-  type    = string
-}
-
-variable "config_volume_device_mnt" {
-  default = "/dev/sdf"
-  type    = string
-}
-
-variable "library_volume_device_mnt" {
-  default = "/dev/sdg"
   type    = string
 }
 

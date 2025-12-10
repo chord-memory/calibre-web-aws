@@ -13,17 +13,12 @@ data "aws_ami" "ubuntu" {
   }
 }
 
-data "template_file" "userdata" {
-  template = file("${path.module}/user_data.sh.tpl")
-  vars = {
-    domain_name    = var.domain_name
-    admin_user     = var.admin_user
-    admin_pass     = var.admin_pass
-    config_volume  = var.config_volume_device_mnt
-    library_volume = var.library_volume_device_mnt
-    library_bucket = aws_s3_bucket.library.bucket
-    setup_bucket   = aws_s3_bucket.setup.bucket
-  }
+locals {
+  user_data_path = "${path.module}/user_data.sh.tpl"
+}
+
+resource "terraform_data" "user_data_hash" {
+  input = filemd5(local.user_data_path)
 }
 
 resource "aws_instance" "ec2" {
@@ -31,20 +26,40 @@ resource "aws_instance" "ec2" {
   instance_type               = "t3.micro"
   subnet_id                   = aws_subnet.public.id
   vpc_security_group_ids      = [aws_security_group.ec2_sg.id]
-
   iam_instance_profile        = aws_iam_instance_profile.ec2_profile.name
 
   root_block_device {
-    volume_size = 20
     volume_type = "gp3"
   }
-  user_data = data.template_file.userdata.rendered
+
+  lifecycle {
+    replace_triggered_by = [
+      terraform_data.user_data_hash
+    ]
+  }
+  user_data = templatefile(local.user_data_path, {
+    domain_name       = var.domain_name
+    admin_user        = var.admin_user
+    admin_pass        = var.admin_pass
+    lib_vol_nodash    = replace(aws_ebs_volume.library.id, "-", "")
+    config_vol_nodash = replace(aws_ebs_volume.config.id, "-", "")
+    library_bucket    = aws_s3_bucket.library.bucket
+    setup_bucket      = aws_s3_bucket.setup.bucket
+  })
 
   tags = { Name = "calibre-server" }
 }
 
 resource "aws_eip" "ec2_eip" {
   instance = aws_instance.ec2.id
-  vpc      = true
+  domain   = "vpc"
   tags     = { Name = "calibre-eip" }
+}
+
+resource "aws_route53_record" "cweb" {
+  zone_id = var.hosted_zone_id
+  name    = "${var.domain_name}."
+  type    = "A"
+  ttl     = 3600
+  records = [aws_eip.ec2_eip.public_ip]
 }

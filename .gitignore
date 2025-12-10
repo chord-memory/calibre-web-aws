@@ -3,3 +3,4 @@ local/config
 terraform/terraform.tfvars
 terraform/.terraform/
 terraform/.terraform*
+terraform/terraform.tfstate*

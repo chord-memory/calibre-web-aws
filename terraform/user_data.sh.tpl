@@ -5,38 +5,54 @@ set -euo pipefail
 # Install updates + Docker
 # -------------------------
 apt-get update -y
-apt-get install -y docker.io docker-compose-plugin awscli
+apt-get install -y docker.io docker-compose awscli
 
 systemctl enable --now docker
 
 # -------------------------
 # Format + mount EBS volumes
 # -------------------------
-mkfs -t ext4 ${config_volume}
-mkfs -t ext4 ${library_volume}
+CONFIG_DEVICE=$(readlink -f "/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_${config_vol_nodash}")
+LIB_DEVICE=$(readlink -f "/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_${lib_vol_nodash}")
 
-mkdir -p /config
-mkdir -p /library
+# Only format if no filesystem exists
+if ! blkid $CONFIG_DEVICE; then
+    mkfs -t ext4 $CONFIG_DEVICE
+fi
 
-echo "${config_volume} /srv/config ext4 defaults,nofail 0 2" >> /etc/fstab
-echo "${library_volume} /srv/library ext4 defaults,nofail 0 2" >> /etc/fstab
+if ! blkid $LIB_DEVICE; then
+    mkfs -t ext4 $LIB_DEVICE
+fi
+
+CONFIG_MOUNT=/srv/config
+LIBRARY_MOUNT=/srv/library
+
+mkdir -p $CONFIG_MOUNT $LIBRARY_MOUNT
+
+CONFIG_FSTAB="$CONFIG_DEVICE $CONFIG_MOUNT ext4 defaults,nofail 0 2"
+LIB_FSTAB="$LIB_DEVICE $LIBRARY_MOUNT ext4 defaults,nofail 0 2"
+
+grep -qxF "$CONFIG_FSTAB" || echo "$CONFIG_FSTAB" >> /etc/fstab
+grep -qxF "$LIB_FSTAB" || echo "$LIB_FSTAB" >> /etc/fstab
 
 mount -a
 
 # -------------------------
 # Pull cweb setup files from S3
 # -------------------------
-mkdir -p /srv/cweb
-aws s3 sync s3://${setup_bucket} /srv/cweb-setup
+SETUP_MOUNT=/srv/cweb-setup
 
-cd /srv/cweb-setup
+mkdir -p $SETUP_MOUNT
+aws s3 sync s3://${setup_bucket} $SETUP_MOUNT
+
+cd $SETUP_MOUNT
 
 # -------------------------
 # Set initial Calibre-Web admin password
 # -------------------------
-docker compose run --rm calibre-web bash -c "calibre-web -s ${admin_user}:${admin_pass}"
+docker-compose run --rm calibre-web bash -c "calibre-web -s ${admin_user}:${admin_pass}"
 
 # -------------------------
 # Start services
 # -------------------------
-docker compose up -d
+docker-compose up -d
