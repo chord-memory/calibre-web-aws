@@ -29,13 +29,19 @@ LIBRARY_MOUNT=/srv/library
 
 mkdir -p $CONFIG_MOUNT $LIBRARY_MOUNT
 
-CONFIG_FSTAB="$CONFIG_DEVICE $CONFIG_MOUNT ext4 defaults,nofail 0 2"
-LIB_FSTAB="$LIB_DEVICE $LIBRARY_MOUNT ext4 defaults,nofail 0 2"
+CONFIG_UUID=$(blkid -s UUID -o value $CONFIG_DEVICE)
+LIB_UUID=$(blkid -s UUID -o value $LIB_DEVICE)
+
+CONFIG_FSTAB="UUID=$CONFIG_UUID $CONFIG_MOUNT ext4 defaults,nofail 0 2"
+LIB_FSTAB="UUID=$LIB_UUID $LIBRARY_MOUNT ext4 defaults,nofail 0 2"
 
 grep -qxF "$CONFIG_FSTAB" || echo "$CONFIG_FSTAB" >> /etc/fstab
 grep -qxF "$LIB_FSTAB" || echo "$LIB_FSTAB" >> /etc/fstab
 
 mount -a
+
+chown -R 1000:1000 $CONFIG_MOUNT
+chown -R 1000:1000 $LIBRARY_MOUNT
 
 # -------------------------
 # Pull cweb setup files from S3
@@ -50,7 +56,7 @@ cd $SETUP_MOUNT
 # -------------------------
 # Set initial Calibre-Web admin password
 # -------------------------
-docker-compose run --rm calibre-web bash -c "calibre-web -s ${admin_user}:${admin_pass}"
+docker-compose run --rm calibre-web bash -c "python3 /app/calibre-web/cps.py -p /config/app.db -s ${admin_user}:${admin_pass}"
 
 # -------------------------
 # Start services

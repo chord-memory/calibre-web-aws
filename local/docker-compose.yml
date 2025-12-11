@@ -1,6 +1,7 @@
 services:
   calibre-web:
     image: lscr.io/linuxserver/calibre-web:latest
+    container_name: calibre-web
     environment:
       - PUID=501  # uid in `id` output on Mac
       - PGID=20   # gid in `id` output on Mac

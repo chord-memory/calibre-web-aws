@@ -2,6 +2,11 @@
     email ${admin_email}
 }
 ${domain_name} {
-  reverse_proxy /api/* flask:5000
-  reverse_proxy / calibre-web:8083
+  handle_path /api/* {
+    reverse_proxy flask:5000
+  }
+
+  handle {
+    reverse_proxy calibre-web:8083
+  }
 }

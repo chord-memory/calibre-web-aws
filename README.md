@@ -31,6 +31,8 @@ If you want to experiment with Calibre-Web locally before deploying to AWS.
 
 ## Deploy to AWS
 
+### AWS Authentication & Domain
+
 The basic AWS setup steps are:
 * Install AWS CLI
 * Buy Route53 domain
@@ -125,6 +127,8 @@ AWS CLI authentication commands:
 * `export AWS_PROFILE=jordan-sso` to run commands without `--profile` arg
 * `aws sso login --profile jordan-sso` to re-auth when session expires
 
+### Terraform Apply
+
 Requires Terraform. Install using [Homebrew](https://brew.sh/):
 ```
 brew tap hashicorp/tap
@@ -149,6 +153,8 @@ terraform plan
 terraform apply
 ```
 
+Now visit your Calibre-Web instance in a browser at the specified domain name.
+
 <details>
   <summary>Troubleshooting notes:</summary><br>
   
@@ -161,7 +167,43 @@ terraform apply
   * SSH into the EC2 via `aws ssm start-session --target i-xxxxxxxx`
   * Generated user_data file in the EC2 at `/var/lib/cloud/instances/i-xxxxxxxx/user-data.txt`
   * Logs of the user_data script at `/var/log/cloud-init-output.log`
-  * View block device attachments via `sudo lsblk` or `sudo fdisk -l`
+  * View block device attachments via `lsblk` or `fdisk -l` or `blkid`
+</details>
+
+### Calibre-Web Setup
+
+Before you can configure the "Location of Calibre Database", you must follow [Manually Sync Calibre Desktop & Calibre-Web](#manually-sync-calibre-desktop--calibre-web) to make your Calibre Desktop database available to Calibre-Web.
+
+Login with creds:
+* admin/admin_pass from `terraform.tfvars`
+
+On first launch:
+* Calibre-Web will ask for the location of the Calibre library
+* Enter /books (the path inside the container, not on your Mac)
+
+Follow [Kobo Sync Setup](#kobo-sync-setup) below to enable Kobo Sync between your local Calibre-Web instance and your Kobo.
+
+<details>
+  <summary>Alternatively, if you would like your AWS Calibre-Web instance to inherit Kobo Sync configuration from your local Calibre-Web, see attached details:</summary><br>
+
+  Requires the AWS CLI Session Manager plugin. Install using [Homebrew](https://brew.sh/):
+  ```
+  brew update
+  brew install session-manager-plugin
+  session-manager-plugin --version
+  ```
+  Your local Calibre-Web configs may be synced to AWS Calibre-Web by running the provided script:
+  ```
+  # First login to AWS CLI
+  aws sso login --profile jordan-sso
+  export AWS_PROFILE=jordan-sso
+  # Run script (Use EC2 ID)
+  ./sync.sh config i-xxxxxxxx
+  ```
+  Example script output:
+  ```
+  
+  ```
 </details>
 
 ## Kobo Sync Setup
@@ -187,6 +229,7 @@ Once your Calibre-Web instance is running in AWS via the Terraform deployment de
 
 Steps:
 * In Calibre Web > Admin > Edit Basic Configuration > Feature Configuration, check "Enable Kobo Sync"
+* Set "Server External Port" to 443 for AWS Calibre-Web (leave at 8083 for local Calibre-Web)
 * Under the user profile "admin", click Create/View under Kobo Sync Token
 * A popup with a value in the format `api_endpoint=https://example.com/kobo/xxxxxxxxxxxxxxxx` appears
 * Connect the Kobo to a computer, and edit the `api_endpoint` config in `.kobo/Kobo/Kobo eReader.conf`
@@ -266,14 +309,22 @@ brew install session-manager-plugin
 session-manager-plugin --version
 ```
 
-When edits are made to Calibre Desktop such as new ePubs added or Annotations synced to it, these changes may be synced to Calibre-Web by running the following commands:
+When edits are made to Calibre Desktop such as new ePubs added or Annotations synced to it, these changes may be synced to Calibre-Web by running the provided script:
 ```
-# Configure profile
-aws configure --profile calibre-sync
-# On Mac
-aws s3 sync ./my-local-library s3://my-bucket
-# SSH into EC2
-aws ssm start-session --target i-xxxxxxxx
-# On EC2
-aws s3 sync s3://my-bucket /mnt/ebs-library
+# First login to AWS CLI
+aws sso login --profile jordan-sso
+export AWS_PROFILE=jordan-sso
+# Run script (Use EC2 ID)
+./sync.sh library i-xxxxxxxx
+```
+Example script output:
+```
+jordan@Jordans-MBP calibre-web-aws % ./sync.sh library i-06a6db63a2b478825
+Local path [~/calibre-library]: 
+Syncing local library to s3 bucket ...
+Syncing s3 library to ebs ...
+Executing command [eee84978-de34-49e5-9c9a-3bd0f0e611ba]: sudo -u ubuntu aws s3 sync s3://cweb-library /srv/library
+Waiting for completion [eee84978-de34-49e5-9c9a-3bd0f0e611ba]
+Success [eee84978-de34-49e5-9c9a-3bd0f0e611ba]
+jordan@Jordans-MBP calibre-web-aws %
 ```
