@@ -227,13 +227,39 @@ Once your Calibre-Web instance is running in AWS via the Terraform deployment de
   * If your Calibre-Web UI appears in the browser on your phone then the Kobo Sync should work
 </details><br>
 
+<details>
+  <summary>If you have already synced your Kobo with a local Calibre-Web and just deployed another Calibre-Web to AWS, see attached details:</summary><br>
+  The books synced to your Kobo via local Calibre-Web will be duplicated if you sync your Kobo via AWS Calibre-Web. To prevent this, you can copy your settings from your local Calibre-Web to your AWS Calibre-Web. Use the script provided:
+
+  Requires the AWS CLI Session Manager plugin. Install using [Homebrew](https://brew.sh/):
+  ```
+  brew update
+  brew install session-manager-plugin
+  session-manager-plugin --version
+  ```
+  Execute script:
+  ```
+  # First login to AWS CLI
+  aws sso login --profile jordan-sso
+  export AWS_PROFILE=jordan-sso
+  # Run script (Use EC2 ID)
+  ./sync.sh config i-xxxxxxxx
+  ```
+  Example script output:
+  ```
+
+  ```
+
+  Continue with steps below. Kobo Sync should already be turned on. Essentially just change "Server External Port" from 8083 to 443 and add your new Kobo Sync Token to your Kobo configuration file.
+</details>
+
 Steps:
 * In Calibre Web > Admin > Edit Basic Configuration > Feature Configuration, check "Enable Kobo Sync"
 * Set "Server External Port" to 443 for AWS Calibre-Web (leave at 8083 for local Calibre-Web)
 * Under the user profile "admin", click Create/View under Kobo Sync Token
 * A popup with a value in the format `api_endpoint=https://example.com/kobo/xxxxxxxxxxxxxxxx` appears
 * Connect the Kobo to a computer, and edit the `api_endpoint` config in `.kobo/Kobo/Kobo eReader.conf`
-* Unmount the Kobo and click the circular arrows in the upper right corner and "Sync Now"
+* Unmount the Kobo and click the circular arrows in the upper right corner
 
 Books from Calibre-Web and will be synced to Kobo when "Sync Now" is clicked and the progress % for these books synced to Calibre-Web upon opening/closing the books on the Kobo.
 
@@ -323,8 +349,8 @@ jordan@Jordans-MBP calibre-web-aws % ./sync.sh library i-06a6db63a2b478825
 Local path [~/calibre-library]: 
 Syncing local library to s3 bucket ...
 Syncing s3 library to ebs ...
-Executing command [eee84978-de34-49e5-9c9a-3bd0f0e611ba]: sudo -u ubuntu aws s3 sync s3://cweb-library /srv/library
-Waiting for completion [eee84978-de34-49e5-9c9a-3bd0f0e611ba]
-Success [eee84978-de34-49e5-9c9a-3bd0f0e611ba]
+[eee84978-de34-49e5-9c9a-3bd0f0e611ba] Executing command: sudo -u ubuntu aws s3 sync s3://cweb-library /srv/library
+[eee84978-de34-49e5-9c9a-3bd0f0e611ba] Waiting for completion
+[eee84978-de34-49e5-9c9a-3bd0f0e611ba] Success
 jordan@Jordans-MBP calibre-web-aws %
 ```

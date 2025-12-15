@@ -5,7 +5,7 @@ set -euo pipefail
 # Install updates + Docker
 # -------------------------
 apt-get update -y
-apt-get install -y docker.io docker-compose awscli
+apt-get install -y docker.io docker-compose awscli sqlite3
 
 systemctl enable --now docker
 

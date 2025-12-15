@@ -9,9 +9,9 @@ ssm_result() {
   local RETCODE=$2
 
   if [[ "$RETCODE" -eq 0 ]]; then
-    echo "Success [$COMMAND_ID]"
+    echo "[$COMMAND_ID] Success"
   else
-    echo "Failed [$COMMAND_ID]: exit code $RETCODE"
+    echo "[$COMMAND_ID] Failed: exit code $RETCODE"
 
     STDOUT=$(aws ssm get-command-invocation \
       --command-id "$COMMAND_ID" \
@@ -26,9 +26,9 @@ ssm_result() {
       --output text)
 
     echo "------ STDOUT ------"
-    echo "$STDOUT"
+    echo "${STDOUT:0:255}"
     echo "------ STDERR ------"
-    echo "$STDERR"
+    echo "${STDERR:0:255}"
 
     exit 1
   fi
@@ -43,13 +43,13 @@ run_ssm() {
     --parameters "{\"commands\": [\"$COMMAND\"]}" \
     --query 'Command.CommandId' \
     --output text)
-  
-  echo "Executing command [$COMMAND_ID]: $COMMAND"
-  echo "Waiting for completion [$COMMAND_ID]"
+
+  echo "[$COMMAND_ID] Executing command: ${COMMAND:0:255}"
+  echo "[$COMMAND_ID] Waiting for completion"
 
   aws ssm wait command-executed \
     --command-id "$COMMAND_ID" \
-    --instance-id "$INSTANCE_ID"
+    --instance-id "$INSTANCE_ID" >/dev/null 2>&1 || true
 
   RETCODE=$(aws ssm get-command-invocation \
     --command-id "$COMMAND_ID" \
@@ -75,21 +75,28 @@ elif [[ "$TARGET" == "config" ]]; then
   read -p "Admin user [admin]: " ADMIN_USER
   ADMIN_USER=${ADMIN_USER:-admin}
   read -sp "Admin pass: " ADMIN_PASS
+  echo
+  if [[ -z "$ADMIN_PASS" ]]; then
+      echo "Admin password cannot be empty."
+      exit 1
+  fi
 
-  echo "Syncing local app.db to s3 bucket ..."
-  aws s3 cp $LOCAL_PATH s3://cweb-config/app.db
+  DATA=$(base64 -i $LOCAL_PATH)
 
   echo "Stopping calibre-web ..."
-  run_ssm "docker stop calibre-web"
+  run_ssm "sudo docker stop calibre-web"
 
-  echo "Syncing s3 config to ebs ..."
-  run_ssm "sudo -u ubuntu aws s3 sync s3://cweb-config /srv/config"
+  echo "Backing up current db ..."
+  run_ssm "sudo -u ubuntu mv /srv/config/app.db /srv/config/app.db.bak"
 
-  echo "Setting admin credentials"
-  run_ssm "docker compose run --rm calibre-web bash -c \"python3 /app/calibre-web/cps.py -p /config/app.db -s ${ADMIN_USER}:${ADMIN_PASS}\""
+  echo "Syncing local config to ebs ..."
+  run_ssm "echo \\\"$DATA\\\" | base64 -d | sudo -u ubuntu tee /srv/config/app.db >/dev/null"
+
+  echo "Setting admin credentials ..."
+  run_ssm "sudo docker compose run --rm calibre-web bash -c \"python3 /app/calibre-web/cps.py -p /config/app.db -s ${ADMIN_USER}:${ADMIN_PASS}\""
 
   echo "Starting calibre-web ..."
-  run_ssm "docker start calibre-web"
+  run_ssm "sudo docker start calibre-web"
 
 else
   echo "Usage: sync.sh [library|config] <instance-id>"
