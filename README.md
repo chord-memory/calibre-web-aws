@@ -229,7 +229,7 @@ Once your Calibre-Web instance is running in AWS via the Terraform deployment de
 
 <details>
   <summary>If you have already synced your Kobo with a local Calibre-Web and just deployed another Calibre-Web to AWS, see attached details:</summary><br>
-  The books synced to your Kobo via local Calibre-Web will be duplicated if you sync your Kobo via AWS Calibre-Web. To prevent this, you can copy your settings from your local Calibre-Web to your AWS Calibre-Web. Use the script provided:
+  The books synced to your Kobo via local Calibre-Web will be duplicated if you sync your Kobo via AWS Calibre-Web. To prevent this, you can copy your settings from your local Calibre-Web to your AWS Calibre-Web. Use the script provided:<br><br>
 
   Requires the AWS CLI Session Manager plugin. Install using [Homebrew](https://brew.sh/):
   ```
@@ -237,6 +237,8 @@ Once your Calibre-Web instance is running in AWS via the Terraform deployment de
   brew install session-manager-plugin
   session-manager-plugin --version
   ```
+  Also requires jq: `brew install jq`
+
   Execute script:
   ```
   # First login to AWS CLI
@@ -245,19 +247,14 @@ Once your Calibre-Web instance is running in AWS via the Terraform deployment de
   # Run script (Use EC2 ID)
   ./sync.sh config i-xxxxxxxx
   ```
-  Example script output:
-  ```
-
-  ```
-
   Continue with steps below. Kobo Sync should already be turned on. Essentially just change "Server External Port" from 8083 to 443 and add your new Kobo Sync Token to your Kobo configuration file.
-</details>
+</details><br>
 
 Steps:
 * In Calibre Web > Admin > Edit Basic Configuration > Feature Configuration, check "Enable Kobo Sync"
-* Set "Server External Port" to 443 for AWS Calibre-Web (leave at 8083 for local Calibre-Web)
+* Set "Server External Port" to 80 for AWS Calibre-Web (leave at 8083 for local Calibre-Web)
 * Under the user profile "admin", click Create/View under Kobo Sync Token
-* A popup with a value in the format `api_endpoint=https://example.com/kobo/xxxxxxxxxxxxxxxx` appears
+* A popup with a value in the format `api_endpoint=http://example.com/kobo/xxxxxxxxxxxxxxxx` appears
 * Connect the Kobo to a computer, and edit the `api_endpoint` config in `.kobo/Kobo/Kobo eReader.conf`
 * Unmount the Kobo and click the circular arrows in the upper right corner
 
@@ -299,11 +296,21 @@ If you care about the progress % being synced from Kobo up to Calibre-Web, you c
 
 <details>
   <summary>Reading % sync for Calibre-Web running in AWS:</summary><br>
-  You can SSH into the EC2 via `aws ssm start-session --target i-xxxxxxxx` and view the database as referened by the local Calibre-Web steps.
-  Or use the provided API endpoints // TODO
+
+  You can SSH into the EC2 via `aws ssm start-session --target i-xxxxxxxx` and view the database as referened by the local Calibre-Web steps. Open a sqlite shell on your EC2 with `sqlite3 /srv/config/app.db`. Alternatively you can use the provided REST API endpoint:
+  ```
+  TODO
+  ```
 </details><br>
 
-Note that any sideloaded books synced from Calibre desktop will be duplicated. See below to safely transition from Calibre desktop to Calibre-Web.
+Note that `SideloadedMode=True` from the `.kobo/Kobo/Kobo eReader.conf` file will automatically be edited to `False` upon syncing.
+<details>
+  <summary>See details below on maintaining SideloadedMode style UI while syncing with Calibre-Web:</summary><br>
+
+  TODO
+</details><br>
+
+Also note that any sideloaded books synced from Calibre desktop will be duplicated. See below to safely transition from Calibre desktop to Calibre-Web.
 
 ## Transition from Desktop to Web
 
@@ -334,6 +341,7 @@ brew update
 brew install session-manager-plugin
 session-manager-plugin --version
 ```
+Also requires jq: `brew install jq`
 
 When edits are made to Calibre Desktop such as new ePubs added or Annotations synced to it, these changes may be synced to Calibre-Web by running the provided script:
 ```
@@ -342,15 +350,4 @@ aws sso login --profile jordan-sso
 export AWS_PROFILE=jordan-sso
 # Run script (Use EC2 ID)
 ./sync.sh library i-xxxxxxxx
-```
-Example script output:
-```
-jordan@Jordans-MBP calibre-web-aws % ./sync.sh library i-06a6db63a2b478825
-Local path [~/calibre-library]: 
-Syncing local library to s3 bucket ...
-Syncing s3 library to ebs ...
-[eee84978-de34-49e5-9c9a-3bd0f0e611ba] Executing command: sudo -u ubuntu aws s3 sync s3://cweb-library /srv/library
-[eee84978-de34-49e5-9c9a-3bd0f0e611ba] Waiting for completion
-[eee84978-de34-49e5-9c9a-3bd0f0e611ba] Success
-jordan@Jordans-MBP calibre-web-aws %
 ```

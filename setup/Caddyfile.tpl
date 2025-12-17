@@ -7,6 +7,8 @@ ${domain_name} {
   }
 
   handle {
-    reverse_proxy calibre-web:8083
+    reverse_proxy calibre-web:8083 {
+      header_up X-Scheme {http.request.scheme}
+    }
   }
 }
