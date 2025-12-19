@@ -42,8 +42,8 @@ resource "aws_instance" "ec2" {
     admin_user        = var.admin_user
     admin_pass        = var.admin_pass
     lib_vol_nodash    = replace(aws_ebs_volume.library.id, "-", "")
+    ingest_vol_nodash = replace(aws_ebs_volume.ingest.id, "-", "")
     config_vol_nodash = replace(aws_ebs_volume.config.id, "-", "")
-    library_bucket    = aws_s3_bucket.library.bucket
     setup_bucket      = aws_s3_bucket.setup.bucket
   })
 

@@ -15,15 +15,17 @@ services:
     restart: unless-stopped
 
   calibre-web:
-    image: lscr.io/linuxserver/calibre-web:latest
+    image: ${docker_image}
     container_name: calibre-web
     environment:
       - PUID=1000
       - PGID=1000
       - TZ=America/Chicago
+      - HARDCOVER_TOKEN=${hardcover_token}
     volumes:
       - /srv/config:/config
-      - /srv/library:/books
+      - /srv/ingest:/cwa-book-ingest
+      - /srv/library:/calibre-library
     ports:
       - 8083:8083
     restart: unless-stopped

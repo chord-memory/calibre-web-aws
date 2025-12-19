@@ -13,3 +13,7 @@ output "ec2_instance_id" {
 output "s3_library_bucket" {
   value = aws_s3_bucket.library.bucket
 }
+
+output "s3_ingest_bucket" {
+  value = aws_s3_bucket.ingest.bucket
+}

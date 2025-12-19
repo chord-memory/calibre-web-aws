@@ -3,6 +3,11 @@ resource "aws_s3_bucket" "library" {
   tags   = { Name = var.library_bucket_name }
 }
 
+resource "aws_s3_bucket" "ingest" {
+  bucket = var.ingest_bucket_name
+  tags   = { Name = var.ingest_bucket_name }
+}
+
 resource "aws_s3_bucket" "setup" {
   bucket = var.setup_bucket_name
   tags   = { Name = var.setup_bucket_name }
@@ -15,6 +20,16 @@ resource "aws_s3_object" "caddy" {
   content = templatefile("${var.setup_path}/Caddyfile.tpl", {
     admin_email = var.admin_email
     domain_name = var.domain_name
+  })
+}
+
+# Upload docker-compose rendered
+resource "aws_s3_object" "docker_compose" {
+  bucket = aws_s3_bucket.setup.id
+  key    = "docker-compose.yml"
+  content = templatefile("${var.setup_path}/docker-compose.yml.tpl", {
+    docker_image    = var.docker_image
+    hardcover_token = var.hardcover_token
   })
 }
 

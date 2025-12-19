@@ -1,5 +1,9 @@
 .DS_Store
+.env
 local/config
+local/ingest
+local/library
+local/.env
 terraform/terraform.tfvars
 terraform/.terraform/
 terraform/.terraform*

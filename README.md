@@ -1,32 +1,40 @@
 # calibre-web-aws
 
-The calibre-web-aws project serves to deploy a [Calibre-Web](https://github.com/janeczku/calibre-web) docker container fronted by a [Caddy](https://caddyserver.com/docs/) reverse proxy, in addition to a small Flask API for exposing the progress % over HTTPS. [chord-memory.net](https://github.com/chord-memory/chord-memory-net) utilizes the deployed Calibre-Web & API to display progress % for eBooks on Kobo via the Kobo Sync feature.
+The calibre-web-aws project serves to deploy a [Calibre-Web-Automated](https://github.com/crocodilestick/Calibre-Web-Automated) docker container fronted by a [Caddy](https://caddyserver.com/docs/) reverse proxy, in addition to a small Flask API for exposing the progress % over HTTPS. [chord-memory.net](https://github.com/chord-memory/chord-memory-net) utilizes the deployed Calibre-Web-Automated & API to display progress % for eBooks on Kobo via the Kobo Sync feature.
 
-While the Calibre-Web instance runs in an EC2 instance in AWS, it needs access to a Calibre desktop library which I maintain locally on my Mac. To maintain synchronicity, I sync my local Calibre library to S3 and then from S3 to the EBS storage used by the Calibre-Web EC2 instance when I add new books or Annotations. More details in [Manually Sync Calibre Desktop & Calibre-Web](#manually-sync-calibre-desktop--calibre-web) below.
+In order for Calibre-Web-Automated to sync annotations & reading progress to [Hardcover](https://hardcover.app/) or to use Hardcover as a metadata provider, generate an account, and generate an API key following [this guide](https://docs.hardcover.app/api/getting-started/#getting-an-api-key). You will use the generated token in steps below.
 
 ## Run Locally
 
-If you want to experiment with Calibre-Web locally before deploying to AWS.
+If you want to experiment with Calibre-Web-Automated locally before deploying to AWS.
 
 <details>
   <summary>See local deployment details:</summary><br>
 
   Requires docker and docker-compose. For Mac, simply install Docker Desktop from the docker website [here](https://docs.docker.com/desktop/setup/install/mac-install/).
 
-  To test run the official [calibre-web](https://hub.docker.com/r/linuxserver/calibre-web) image on Mac, cd into the `local` directory and run:
+  Generate a .env file in the `local` directory of the format:
+  ```
+  LIBRARY_PATH=~/calibre-library
+  DOCKER_IMAGE=chord-memory/calibre-web-automated:main
+  HARDCOVER_TOKEN="Bearer XXXXXXXXXX"
+  ```
+  * Provide the correct path to the location of your Calibre desktop library on your Mac for `LIBRARY_PATH`. You can omit the `LIBRARY_PATH` if you do not already have a Calibre desktop libaray.
+  * Provide a `DOCKER_IMAGE` e.g. the `chord-memory/calibre-web-automated:main` image which includes the unreleased Hardcover annotations sync feature. You can omit the `DOCKER_IMAGE` to default to the latest official [calibre-web-automated](https://hub.docker.com/r/crocodilestick/calibre-web-automated) image.
+  * Provide the Hardover API key mentioned above for `HARDCOVER_TOKEN`. You can omit the `HARDCOVER_TOKEN` if not using Hardcover as a metadata provider. 
+
+  To test run the a Calibre-Web-Automated server on Mac, cd into the `local` directory and run:
   ```
   docker-compose up -d
   ```
-  and then view the Calibre-Web UI at http://localhost:8083. Ensure your Calibre desktop books are in `~/calibre-library`, otherwise edit `~/calibre-library` in `local/docker-compose.yml` to the location of your Calibre desktop library on your Mac.
+  and then view the Calibre-Web-Automated UI at http://localhost:8083. 
 
   Login with creds:
   * admin/admin123
 
-  On first launch:
-  * Calibre-Web will ask for the location of the Calibre library
-  * Enter /books (the path inside the container, not on your Mac)
+  // TODO link to how to test the ingest stuff below
 
-  Follow [Kobo Sync Setup](#kobo-sync-setup) below to enable Kobo Sync between your local Calibre-Web instance and your Kobo. 
+  Follow [Kobo Sync Setup](#kobo-sync-setup) below to enable Kobo Sync between your local Calibre-Web-Automated instance and your Kobo. 
 </details>
 
 ## Deploy to AWS
@@ -137,13 +145,17 @@ terraform --version
 ```
 Generate a `terraform.tfvars` file in `terraform` with the following variables:
 ```
-domain_name    = "cweb.my-domain.net"
-profile        = "jordan-sso"
-hosted_zone_id = "ZXXXXXXXXXXXXX"
-admin_pass     = "CHANGEME"
-admin_email    = "you@example.com"
-region         = "us-east-1"
+domain_name     = "cweb.my-domain.net"
+profile         = "jordan-sso"
+hosted_zone_id  = "ZXXXXXXXXXXXXX"
+admin_pass      = "CHANGEME"
+admin_email     = "you@example.com"
+region          = "us-east-1"
+docker_image    = "chord-memory/calibre-web-automated:main"
+hardcover_token = "Bearer XXXXXXXXXX"
 ```
+Note that `docker_image` and `hardcover_token` are both optional. You can omit the `hardcover_token` if not using Hardcover as a metadata provider. You can omit the `docker_image` to default to the latest official [calibre-web-automated](https://hub.docker.com/r/crocodilestick/calibre-web-automated) image. In the example above I have provided the `chord-memory/calibre-web-automated:main` image which includes the unreleased Hardcover annotations sync feature.
+
 While logged into the AWS CLI, deploy resources with the commands:
 ```
 cd terraform
@@ -152,8 +164,12 @@ terraform validate
 terraform plan
 terraform apply
 ```
+The EC2 instance ID will output from the `terraform apply` command. Keep track of this for future steps.
 
-Now visit your Calibre-Web instance in a browser at the specified domain name.
+Now visit your Calibre-Web-Automated instance in a browser at the specified domain name.
+
+Login with creds:
+* admin/admin_pass from `terraform.tfvars`
 
 <details>
   <summary>Troubleshooting notes:</summary><br>
@@ -170,21 +186,38 @@ Now visit your Calibre-Web instance in a browser at the specified domain name.
   * View block device attachments via `lsblk` or `fdisk -l` or `blkid`
 </details>
 
-### Calibre-Web Setup
+## Sync Local Data to AWS
 
-Before you can configure the "Location of Calibre Database", you must follow [Manually Sync Calibre Desktop & Calibre-Web](#manually-sync-calibre-desktop--calibre-web) to make your Calibre Desktop database available to Calibre-Web.
+### Sync Calibre Desktop Library to Calibre-Web
 
-Login with creds:
-* admin/admin_pass from `terraform.tfvars`
+If you have a local Calibre desktop library, you must run the sync script to make your Calibre desktop library available to Calibre-Web.
 
-On first launch:
-* Calibre-Web will ask for the location of the Calibre library
-* Enter /books (the path inside the container, not on your Mac)
+Requires the AWS CLI Session Manager plugin. Install using [Homebrew](https://brew.sh/):
+```
+brew update
+brew install session-manager-plugin
+session-manager-plugin --version
+```
+Also requires jq: `brew install jq`
 
-Follow [Kobo Sync Setup](#kobo-sync-setup) below to enable Kobo Sync between your local Calibre-Web instance and your Kobo.
+Execute:
+```
+# First login to AWS CLI
+aws sso login --profile jordan-sso
+export AWS_PROFILE=jordan-sso
+# Run script (Use EC2 ID)
+./sync.sh library i-xxxxxxxx
+```
+
+Your books should now be visible in the Calibe-Web-Automated UI in AWS.
+
+### Sync Local Calibre-Web Config to Calibre-Web in AWS
+
+If you have already synced your Kobo with a local Calibre-Web and just deployed another Calibre-Web to AWS, the books synced to your Kobo via local Calibre-Web will be duplicated if you sync your Kobo via AWS Calibre-Web.
 
 <details>
-  <summary>Alternatively, if you would like your AWS Calibre-Web instance to inherit Kobo Sync configuration from your local Calibre-Web, see attached details:</summary><br>
+  <summary>See attached details to resolve:</summary><br>
+  To prevent book duplication, you can copy your config from your local Calibre-Web to your AWS Calibre-Web. Use the script provided:<br><br>
 
   Requires the AWS CLI Session Manager plugin. Install using [Homebrew](https://brew.sh/):
   ```
@@ -192,7 +225,9 @@ Follow [Kobo Sync Setup](#kobo-sync-setup) below to enable Kobo Sync between you
   brew install session-manager-plugin
   session-manager-plugin --version
   ```
-  Your local Calibre-Web configs may be synced to AWS Calibre-Web by running the provided script:
+  Also requires jq: `brew install jq`
+
+  Execute script:
   ```
   # First login to AWS CLI
   aws sso login --profile jordan-sso
@@ -200,11 +235,10 @@ Follow [Kobo Sync Setup](#kobo-sync-setup) below to enable Kobo Sync between you
   # Run script (Use EC2 ID)
   ./sync.sh config i-xxxxxxxx
   ```
-  Example script output:
-  ```
-  
-  ```
-</details>
+  Continue with steps below for Kobo Sync Setup. Some steps may be skipped. For example, Kobo Sync should already be turned on, because your configurations were copied from local Calibre-Web to AWS Calibre-Web. Essentially you will just change "Server External Port" from 8083 to 80 and add your new Kobo Sync Token to your Kobo configuration file.
+</details><br>
+
+^^^ In progress. For CWA need to sync cwa.db and processed_books as well potentially. Maybe better to just delete all books on eReader before final sync with AWS Calibre-Web. But these notes could be useful for someone migrating from bare metal to AWS.
 
 ## Kobo Sync Setup
 
@@ -227,29 +261,6 @@ Once your Calibre-Web instance is running in AWS via the Terraform deployment de
   * If your Calibre-Web UI appears in the browser on your phone then the Kobo Sync should work
 </details><br>
 
-<details>
-  <summary>If you have already synced your Kobo with a local Calibre-Web and just deployed another Calibre-Web to AWS, see attached details:</summary><br>
-  The books synced to your Kobo via local Calibre-Web will be duplicated if you sync your Kobo via AWS Calibre-Web. To prevent this, you can copy your settings from your local Calibre-Web to your AWS Calibre-Web. Use the script provided:<br><br>
-
-  Requires the AWS CLI Session Manager plugin. Install using [Homebrew](https://brew.sh/):
-  ```
-  brew update
-  brew install session-manager-plugin
-  session-manager-plugin --version
-  ```
-  Also requires jq: `brew install jq`
-
-  Execute script:
-  ```
-  # First login to AWS CLI
-  aws sso login --profile jordan-sso
-  export AWS_PROFILE=jordan-sso
-  # Run script (Use EC2 ID)
-  ./sync.sh config i-xxxxxxxx
-  ```
-  Continue with steps below. Kobo Sync should already be turned on. Essentially just change "Server External Port" from 8083 to 443 and add your new Kobo Sync Token to your Kobo configuration file.
-</details><br>
-
 Steps:
 * In Calibre Web > Admin > Edit Basic Configuration > Feature Configuration, check "Enable Kobo Sync"
 * Set "Server External Port" to 80 for AWS Calibre-Web (leave at 8083 for local Calibre-Web)
@@ -258,14 +269,14 @@ Steps:
 * Connect the Kobo to a computer, and edit the `api_endpoint` config in `.kobo/Kobo/Kobo eReader.conf`
 * Unmount the Kobo and click the circular arrows in the upper right corner
 
-Books from Calibre-Web and will be synced to Kobo when "Sync Now" is clicked and the progress % for these books synced to Calibre-Web upon opening/closing the books on the Kobo.
+Books from Calibre-Web-Automated and will be synced to Kobo when "Sync Now" is clicked and the progress % for these books synced to Calibre-Web-Automated upon opening/closing the books on the Kobo.
 
-If you care about the progress % being synced from Kobo up to Calibre-Web, you can follow the steps below to ensure the % is being synced.
+If you care about the progress % and annotations being synced from Kobo up to Calibre-Web-Automated, you can follow the steps below to ensure the % is being synced.
 
 <details>
-  <summary>Reading % sync for Calibre-Web running locally:</summary><br>
+  <summary>Reading % sync for Calibre-Web-Automated running locally:</summary><br>
 
-  Use `sqlite3 local/config/app.db` to view the progress % changing for books added to the Kobo via Calibre-Web:
+  Use `sqlite3 local/config/app.db` to view the progress % changing for books added to the Kobo via Calibre-Web-Automated:
   ```
   jordan@Jordans-MBP calibre-web-aws % sqlite3 local/config/app.db
   SQLite version 3.43.2 2023-10-10 13:08:14
@@ -303,6 +314,12 @@ If you care about the progress % being synced from Kobo up to Calibre-Web, you c
   ```
 </details><br>
 
+<details>
+  <summary>Reading % plus Annotations sync for Calibre-Web integrated with Hardcover:</summary><br>
+
+  TODO
+</details>
+
 Note that `SideloadedMode=True` from the `.kobo/Kobo/Kobo eReader.conf` file will automatically be edited to `False` upon syncing.
 <details>
   <summary>See details below on maintaining SideloadedMode style UI while syncing with Calibre-Web:</summary><br>
@@ -310,17 +327,28 @@ Note that `SideloadedMode=True` from the `.kobo/Kobo/Kobo eReader.conf` file wil
   TODO
 </details><br>
 
-Also note that any sideloaded books synced from Calibre desktop will be duplicated. See below to safely transition from Calibre desktop to Calibre-Web.
+**Also note that any sideloaded books synced from Calibre desktop will be duplicated**. See below to safely transition from Calibre desktop to Calibre-Web.
 
 ## Transition from Desktop to Web
 
 * Transfer annotations off of Kobo to Calibre desktop via Annotations plugin
-* Write down current reading postition for in progress books or sync with KoboUtilities plugin
-* Delete all sideloaded books from Kobo // TODO: one by one manually?
+* Create new Backup Annotations column with `annotations_backup` lookup name
+* Backup annotations by selecting all books with Annotations and clicking Edit Metadata in Bulk
+  * Search mode: Regular expression
+  * Search Field: `#mm_annotations`
+  * Search for: `(.|\n)*`
+  * Replace with: `\g<0>`
+  * Destination Field: `#annotations_backup`
+  * Can test with Test text field then Apply
+* Write down current reading postition for in progress books or sync bookmark with KoboUtilities plugin
+* Note: cannot sync bookmark with KoboUtilies plugin if you have duplicated books via Calibre-Web
+* Delete all books from Kobo by navigating to Settings > 
 * Transfer books from Calibre-Web to Kobo by clicking "Sync Now" on Kobo
 * Open in progress books and manually set them to correct reading position or sync with KoboUtilities plugin
 * Annotations for previously sideloaded books now live in Calibre Desktop
 // TODO: Ensure that Annotations for sideloaded books are not deleted when new Annotations get fetched
+
+^^^ In progress. We will not need to backup annotations if annotations go to Hardcover now. Reading % sync via KoboUtilities was not working perhaps because books were duplicated. So maybe do this before Syncing. Can test this by deleting all books and restarting. After annotations are backed up ofc. Any way to get Calibe desktop annotations into Hardcover? Prob not. These will be still viewable in Calibe-Web-Automated and Calibre desktop. And annotations could still be synced to Calibre-Desktop if book is added to that library too & metadata not edited between library & ePub
 
 ## Calibre -> Kobo Workflow
 
@@ -333,21 +361,25 @@ Also note that any sideloaded books synced from Calibre desktop will be duplicat
 * Cannot use KoboUtilities edit book metadata & cover bc Calibre-Web loaded book will not be recognized by Calibre desktop on Kobo if book metadata & cover are edited in Calibre desktop
 * When [this PR](https://github.com/janeczku/calibre-web/pull/3381) is merged then book metadata & cover can be edited in Calibre desktop followed by aws s3/ebs sync and "Sync Now" on Kobo
 
-## Manually Sync Calibre Desktop & Calibre-Web
+^^^ In progress. Annotations should hopefully be in Hardcover now so Calibre Desktop will not be used. Books downloaded from downloader (TODO) or ./sync.sh ingest (TODO)
 
-Requires the AWS CLI Session Manager plugin. Install using [Homebrew](https://brew.sh/):
-```
-brew update
-brew install session-manager-plugin
-session-manager-plugin --version
-```
-Also requires jq: `brew install jq`
+## Build CWA Image
 
-When edits are made to Calibre Desktop such as new ePubs added or Annotations synced to it, these changes may be synced to Calibre-Web by running the provided script:
-```
-# First login to AWS CLI
-aws sso login --profile jordan-sso
-export AWS_PROFILE=jordan-sso
-# Run script (Use EC2 ID)
-./sync.sh library i-xxxxxxxx
-```
+These are personal notes to remind myself how to publish calibre-web-automated images under my GitHub profile to test new features.
+
+<details>
+  <summary>See GHCR publishing steps:</summary><br>
+
+  If GHCR PAT has expired:
+  * Generate GitHub Personal Access Token with write/read packages permissions
+  * GitHub > Settings > Developer Settings > Personal Access Tokens > Generate New Token (Classic)
+  * Token name: `ghcr-docker`, Select `write:packages` (`read:packages` and `repo` auto-selects)
+  * Copy token into `GHCR_PAT="<token>"` in .env in calibre-web-aws directory
+
+  Execute:
+  ```
+  ./build.sh
+  ```
+
+  Note that I manually edited the package to be public in the GitHub UI.
+</details>

@@ -18,6 +18,18 @@ variable "hosted_zone_id" {
   type        = string
 }
 
+variable "docker_image" {
+  description = "Name & tag of calibre-web-automated image from registry"
+  type        = string
+  default     = "crocodilestick/calibre-web-automated:latest"
+}
+
+variable "hardcover_token" {
+  description = "Hardcover API Key for metadata provider feature"
+  type        = string
+  default     = ""
+}
+
 variable "setup_path" {
   default     = "../setup"
   type        = string
@@ -28,12 +40,22 @@ variable "library_bucket_name" {
   type    = string
 }
 
+variable "ingest_bucket_name" {
+  default = "cweb-ingest"
+  type    = string
+}
+
 variable "setup_bucket_name" {
   default = "cweb-setup"
   type    = string
 }
 
 variable "config_volume_size_gb" {
+  default = 4
+  type    = number
+}
+
+variable "ingest_volume_size_gb" {
   default = 4
   type    = number
 }

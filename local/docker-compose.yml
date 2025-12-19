@@ -1,14 +1,16 @@
 services:
   calibre-web:
-    image: lscr.io/linuxserver/calibre-web:latest
+    image: ${DOCKER_IMAGE:-crocodilestick/calibre-web-automated:latest}
     container_name: calibre-web
     environment:
-      - PUID=501  # uid in `id` output on Mac
-      - PGID=20   # gid in `id` output on Mac
+      - PUID=1000
+      - PGID=1000
       - TZ=America/Chicago
+      - HARDCOVER_TOKEN=${HARDCOVER_TOKEN:-}
     volumes:
       - ./config:/config
-      - ~/calibre-library:/books
+      - ./ingest:/cwa-book-ingest
+      - ${LIBRARY_PATH:-./library}:/calibre-library
     ports:
       - 8083:8083
     restart: unless-stopped

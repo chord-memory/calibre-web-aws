@@ -53,6 +53,8 @@ data "aws_iam_policy_document" "s3_readonly_for_ec2" {
     resources = [
       aws_s3_bucket.library.arn,
       "${aws_s3_bucket.library.arn}/*",
+      aws_s3_bucket.ingest.arn,
+      "${aws_s3_bucket.ingest.arn}/*",
       aws_s3_bucket.setup.arn,
       "${aws_s3_bucket.setup.arn}/*"
     ]
