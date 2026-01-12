@@ -22,9 +22,9 @@ LIBRARY_MOUNT=/srv/library
 
 mount_volume() {
     local VOL_ID=$1
-    local MOUNT=$1
+    local MOUNT=$2
 
-    DEVICE=$(readlink -f "/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_${VOL_ID}")
+    DEVICE=$(readlink -f "/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_$VOL_ID")
 
     # Only format if no filesystem exists
     if ! blkid $DEVICE; then
@@ -69,3 +69,28 @@ docker-compose run --rm calibre-web bash -c "python3 /app/calibre-web/cps.py -p 
 # Start services
 # -------------------------
 docker-compose up -d
+
+# -------------------------
+# Generate shelf to add all books to for Kobo Sync
+# -------------------------
+
+uuid=$(uuidgen)
+insert into shelf (uuid, name, is_public, user_id, kobo_sync, created, last_modified) values ($uuid, "Admin Sync", 0, 1, 1, datetime('now'), datetime('now'));
+
+INSERT INTO book_shelf_link (book_id, "order", shelf, date_added) 
+VALUES 
+  (61, 1, 1, datetime('now')), 
+  (37, 2, 1, datetime('now')), 
+  (56, 3, 1, datetime('now')), 
+  (54, 4, 1, datetime('now')), 
+  (48, 5, 1, datetime('now')), 
+  (53, 6, 1, datetime('now')), 
+  (40, 7, 1, datetime('now')), 
+  (29, 8, 1, datetime('now'));
+
+# -------------------------
+# Make Calibre-Web assume all books already downloaded
+# -------------------------
+
+insert into kobo_synced_books (user_id, book_id) values (1, 61), (1, 37), (1, 56), (1, 54), (1, 48), (1, 53), (1, 40), (1, 29);
+insert into downloads (user_id, book_id) values (1, 61), (1, 37), (1, 56), (1, 54), (1, 48), (1, 53), (1, 40), (1, 29);

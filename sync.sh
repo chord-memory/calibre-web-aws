@@ -102,6 +102,24 @@ if [[ "$TARGET" == "library" ]]; then
 
   echo "Library sync complete."
 
+elif [[ "$TARGET" == "ingest" ]]; then
+  LOCAL_PATH="~/calibre-ingest"
+  read -p "Local path [$LOCAL_PATH]: " INPUT_PATH
+  LOCAL_PATH=${INPUT_PATH:-$LOCAL_PATH}
+  # Expand leading ~ if present
+  LOCAL_PATH="${LOCAL_PATH/#~/$HOME}"
+
+  S3_PATH=s3://cweb-ingest
+  EC2_PATH=/srv/ingest
+
+  echo "Syncing local ingest dir to s3 bucket ..."
+  aws s3 sync $LOCAL_PATH $S3_PATH --exclude ".*"
+
+  echo "Syncing s3 ingest bucket to ebs ..."
+  run_ssm "sudo -u ubuntu aws s3 sync $S3_PATH $EC2_PATH --exact-timestamps"
+
+  echo "Ingest sync complete."
+
 elif [[ "$TARGET" == "config" ]]; then
   LOCAL_PATH=./local/config/app.db
   read -p "Local path [$LOCAL_PATH]: " INPUT_PATH
