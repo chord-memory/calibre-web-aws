@@ -113,7 +113,7 @@ elif [[ "$TARGET" == "ingest" ]]; then
   EC2_PATH=/srv/ingest
 
   echo "Syncing local ingest dir to s3 bucket ..."
-  aws s3 sync $LOCAL_PATH $S3_PATH --exclude ".*"
+  aws s3 sync $LOCAL_PATH $S3_PATH --exclude ".*" --delete
 
   echo "Syncing s3 ingest bucket to ebs ..."
   run_ssm "sudo -u ubuntu aws s3 sync $S3_PATH $EC2_PATH --exact-timestamps"

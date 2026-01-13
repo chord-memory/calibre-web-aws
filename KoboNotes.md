@@ -1,5 +1,28 @@
 # `KoboReader.sqlite` Explained
 
+Connect to `KoboReader.sqlite` by plugging the Kobo into your Mac and opening the `KoboReader.sqlite` from the Kobo Volume with `sqlite3`:
+```
+jordan@Jordans-MBP ~ % sqlite3 /Volumes/KOBOeReader/.kobo/KoboReader.sqlite
+SQLite version 3.43.2 2023-10-10 13:08:14
+Enter ".help" for usage hints.
+sqlite> .tables
+AbTest                 KoboPlusAssetGroup     Wishlist             
+Achievement            KoboPlusAssets         WordList             
+Activity               OverDriveCards         content              
+AnalyticsEvents        OverDriveCheckoutBook  content_keys         
+Authors                OverDriveLibrary       content_settings     
+BookAuthors            Reviews                ratings              
+Bookmark               Rules                  shortcover_page      
+DbVersion              Shelf                  user                 
+DropboxItem            ShelfContent           volume_shortcovers   
+Event                  SubscriptionProducts   volume_tabs          
+GDriveItem             SyncQueue            
+KoblimeSync            Tab                  
+sqlite>
+```
+
+## `content` Overview
+
 The `content` table is the most important table in the Kobo database. There are 2 different types of entries in the `content` table: 1 main entry per book and multiple sub-entries per book. When there is no `BookID` for an entry, the entry is the main book entry, and the `ContentID` is the primary ID for the book. For the remaining sub-entries, the `BookID` will be the `ContentID` from the main book entry, and the `ContendID` represents subfiles of the main ePub file.
 
 If the book was sideloaded, the format of the `ContentID` is file-system-based: `file:///mnt/onboard/Ward, Brian/How Linux Works - Brian Ward.kepub.epub`. If the book was loaded via Calibre-Web, the format of the `ContentID` is a UUID like `6f03d308-6370-4dc6-935b-2aede5cc81c3`, and matches the `uuid` in the `books` table in `metadata.db` in the ~/calibre-library directory of your Calibre-Web/CWA server.
@@ -42,6 +65,19 @@ UserID                                UserDisplayName           UserEmail
 d5e94a94-bc32-4b48-b229-6de0c8e31665  jordancahill88@gmail.com  jordancahill88@gmail.com
 ```
 
+Note that for Calibre-Web/CWA-loaded books, the `ContentID` UUID for the main book entry appears also in the `ImageId`, `WorkId`, `EntitlementId`, and `CrossRevisionId` fields. For sideloaded books, the `ImageId` is equivilant to the `ContentID` if all special characters besides the command and dash are replaced with underscores. `WorkId`, `EntitlementId`, and `CrossRevisionId` are null for sideloaded books.
+```
+sqlite> select ContentID, BookID, Title, BookTitle, ImageId, WorkId, EntitlementId, CrossRevisionId from content where Title = "How Linux Works";
+ContentID                                                     BookID  Title            BookTitle  ImageId                                                       WorkId                                EntitlementId                         CrossRevisionId                     
+------------------------------------------------------------  ------  ---------------  ---------  ------------------------------------------------------------  ------------------------------------  ------------------------------------  ------------------------------------
+file:///mnt/onboard/Ward, Brian/How Linux Works - Brian Ward          How Linux Works             file____mnt_onboard_Ward,_Brian_How_Linux_Works_-_Brian_Ward                                                                                                                  
+.kepub.epub                                                                                       _kepub_epub                                                                                                                                                                   
+
+6f03d308-6370-4dc6-935b-2aede5cc81c3                                  How Linux Works             6f03d308-6370-4dc6-935b-2aede5cc81c3                          6f03d308-6370-4dc6-935b-2aede5cc81c3  6f03d308-6370-4dc6-935b-2aede5cc81c3  6f03d308-6370-4dc6-935b-2aede5cc81c3
+
+```
+I suspect that the `ImageId` may allow the Kobo to find the local ePub files somehow but I am not sure. I don't know the purpose of the `WorkId`, `EntitlementId`, and `CrossRevisionId` fields but want to note these fields' relevance to the `ContentID` for the main book entry.
+
 ## Sub-Entries in `content`
 
 See examples below for both sideloaded and Calibre-Web loaded books:
@@ -80,6 +116,27 @@ ContentID                                             BookID                    
 | `IsDownloaded`    | `1` (sub-files always exist if the parent EPUB is present)                                                |
 | `DownloadUrl`     | `null` (only meaningful for the main book entry)                                                          |
 | `ReadStateSynced` | `false` (reading state is tracked only on the main book row)                                              |
+
+Just to note, the `ImageId`, `WorkId`, `EntitlementId`, and `CrossRevisionId` fields are null for `content` sub-entries.
+```
+sqlite> select ContentID, BookID, Title, BookTitle, ImageId, WorkId, EntitlementId, CrossRevisionId from content where BookID = "file:///mnt/onboard/Ward, Brian/How Linux Works - Brian Ward.kepub.epub" order by VolumeIndex limit 3;
+ContentID                                                     BookID                                                        Title                        BookTitle        ImageId  WorkId  EntitlementId  CrossRevisionId
+------------------------------------------------------------  ------------------------------------------------------------  ---------------------------  ---------------  -------  ------  -------------  ---------------
+/mnt/onboard/Ward, Brian/How Linux Works - Brian Ward.kepub.  file:///mnt/onboard/Ward, Brian/How Linux Works - Brian Ward  cover.xhtml                  How Linux Works                                                 
+epub!OPS!cover.xhtml                                          .kepub.epub                                                                                                                                                
+
+/mnt/onboard/Ward, Brian/How Linux Works - Brian Ward.kepub.  file:///mnt/onboard/Ward, Brian/How Linux Works - Brian Ward  Reviews for How Linux Works  How Linux Works                                                 
+epub!OPS!f01.xhtml-1                                          .kepub.epub                                                                                                                                                
+
+/mnt/onboard/Ward, Brian/How Linux Works - Brian Ward.kepub.  file:///mnt/onboard/Ward, Brian/How Linux Works - Brian Ward  toc.xhtml                    How Linux Works                                                 
+epub!OPS!toc.xhtml                                            .kepub.epub                                                                                                                                                
+sqlite> select ContentID, BookID, Title, BookTitle, ImageId, WorkId, EntitlementId, CrossRevisionId from content where BookID = "6f03d308-6370-4dc6-935b-2aede5cc81c3" order by VolumeIndex limit 3;
+ContentID                                             BookID                                Title                        BookTitle        ImageId  WorkId  EntitlementId  CrossRevisionId
+----------------------------------------------------  ------------------------------------  ---------------------------  ---------------  -------  ------  -------------  ---------------
+6f03d308-6370-4dc6-935b-2aede5cc81c3!OPS!cover.xhtml  6f03d308-6370-4dc6-935b-2aede5cc81c3  cover.xhtml                  How Linux Works                                                 
+6f03d308-6370-4dc6-935b-2aede5cc81c3!OPS!f01.xhtml-1  6f03d308-6370-4dc6-935b-2aede5cc81c3  Reviews for How Linux Works  How Linux Works                                                 
+6f03d308-6370-4dc6-935b-2aede5cc81c3!OPS!toc.xhtml    6f03d308-6370-4dc6-935b-2aede5cc81c3  toc.xhtml                    How Linux Works                                                 
+```
 
 ## Removed Books in `content`
 
@@ -289,4 +346,57 @@ file:///mnt/onboard/Ward, Brian/How Linux Works - Brian Ward  /mnt/onboard/Ward,
 .kepub.epub                                                   epub!OPS!c01.xhtml#h2-500402c01-0004                                                                                                                                                            
 sqlite>
 ```
-TODO: Add Calibre-Web/CWA-loaded Bookmark entries
+
+Here are the same `Bookmark` fields selected for a CWA-loaded book:
+```
+```
+TODO use sapiens highlights bc the notes are in the same place for both the sideloaded & CWA loaded variations. Test if I can move the annotation for sideloaded book to CWA book by just changing the couple IDs
+
+
+## ePub File Locations on Kobo
+
+These files seem to be the Calibre-Web/CWA-loaded books bc `6f03d308-6370-4dc6-935b-2aede5cc81c3` and `f6ddfd47-9b66-4cd7-ab60-e478aa5e92a9` align with the `ContentID` for the 2 books I have downloaded from CWA currently.
+```
+jordan@Jordans-MBP KOBOeReader % ls -la .kobo/kepub
+total 5280
+drwx------  1 jordan  staff     8192 Jan 12 11:05 .
+drwx------  1 jordan  staff     8192 Jan 12 13:54 ..
+-rwx------  1 jordan  staff     4096 Jan 12 11:05 ._6f03d308-6370-4dc6-935b-2aede5cc81c3
+-rwx------@ 1 jordan  staff  2250952 Jan  9 20:20 6f03d308-6370-4dc6-935b-2aede5cc81c3
+-rwx------  1 jordan  staff        0 Dec 17 19:46 8b8442e5-6910-4ad0-b0e4-aaabb3bd1778.temp
+-rwx------  1 jordan  staff   423854 Jan  9 19:14 f6ddfd47-9b66-4cd7-ab60-e478aa5e92a9
+jordan@Jordans-MBP KOBOeReader %
+```
+Sideloaded ePub files preside in the root directory of the device in directories according to author:
+```
+jordan@Jordans-MBP KOBOeReader % ls -la
+total 384
+drwx------  1 jordan  staff   8192 Jan 12 10:24 .
+drwxr-xr-x  4 root    wheel    128 Jan 12 10:24 ..
+drwx------  1 jordan  staff   8192 Dec 16  2023 .Spotlight-V100
+drwx------  1 jordan  staff   8192 Dec 18 17:03 .add
+drwx------  1 jordan  staff   8192 Dec 18 17:03 .adds
+drwx------  1 jordan  staff   8192 Dec 16  2023 .adobe-digital-editions
+drwx------  1 jordan  staff   8192 Jan 12 10:24 .fseventsd
+drwx------  1 jordan  staff   8192 Jan 12 13:54 .kobo
+drwx------  1 jordan  staff   8192 Dec 16  2023 .kobo-images
+drwx------  1 jordan  staff   8192 Aug  5  2024 Dazai, Osamu
+drwx------  1 jordan  staff   8192 Aug 10 21:28 Dolly, Cure
+drwx------  1 jordan  staff   8192 Dec 16  2023 Hanh, Thich Nhat
+drwx------  1 jordan  staff   8192 Jan 11 16:49 Harari, Yuval Noah
+drwx------  1 jordan  staff   8192 Sep 30 00:34 Lamott, Anne
+drwx------  1 jordan  staff   8192 Feb 27  2025 Lem, Stanislaw
+drwx------  1 jordan  staff   8192 Dec 16  2023 Petzold, Charles
+drwx------  1 jordan  staff   8192 Sep 18 00:26 Shelley, Joe & Gibson, Darril
+drwx------  1 jordan  staff   8192 Dec 16  2023 Stephenson, Neal
+drwx------  1 jordan  staff   8192 Apr 17  2025 Ward, Brian
+-rwx------  1 jordan  staff    268 Jan 11 17:05 driveinfo.calibre
+-rwx------  1 jordan  staff  39062 Jan 11 17:05 metadata.calibre
+jordan@Jordans-MBP KOBOeReader % ls -la "Dazai, Osamu"
+total 608
+drwx------  1 jordan  staff    8192 Aug  5  2024 .
+drwx------  1 jordan  staff    8192 Jan 12 10:24 ..
+-rwx------  1 jordan  staff  290486 Aug  5  2024 No Longer Human - Osamu Dazai.kepub.epub
+```
+
+## `Shelf` & `ShelfContent` Tables
