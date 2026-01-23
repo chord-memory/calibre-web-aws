@@ -298,60 +298,61 @@ cid  name                      type     notnull  dflt_value  pk
 23   Type                      TEXT     0                    0
 ```
 
-Here are a couple examples of highlights and notes from a sideloaded book. The `VolumeID` is the `ContentID` from the main book entry in `content`. The `ContentID` in `Bookmark` contains the sub-file where the annotation took place (matching a sub-file `ContenteID` from `content`) with some data appended showing exactly where the annotation took place. 
+Here are a couple examples of highlights and notes from a sideloaded book. The `VolumeID` is the `ContentID` from the main book entry in `content`. The `ContentID` in `Bookmark` contains the sub-file where the annotation took place (matching a sub-file `ContentID` from `content`) with some data appended showing exactly where the annotation took place. 
 ```
-sqlite> select VolumeID, ContentID, Text, Annotation, UserID, Type from Bookmark where VolumeID = "file:///mnt/onboard/Ward, Brian/How Linux Works - Brian Ward.kepub.epub" and Type = "highlight" limit 2;
-VolumeID                                                      ContentID                                                     Text                                                          Annotation  UserID                                Type     
-------------------------------------------------------------  ------------------------------------------------------------  ------------------------------------------------------------  ----------  ------------------------------------  ---------
-file:///mnt/onboard/Ward, Brian/How Linux Works - Brian Ward  /mnt/onboard/Ward, Brian/How Linux Works - Brian Ward.kepub.  I’ve tried to cover the two major distribution families: Deb              d5e94a94-bc32-4b48-b229-6de0c8e31665  highlight
-.kepub.epub                                                   epub!OPS!f06.xhtml#h1-500402f06-0005                          ian (including Ubuntu) and RHEL/Fedora/CentOS. I’ve also foc                                                             
-                                                                                                                            used on desktop and server installations. A significant amou                                                             
-                                                                                                                            nt of material carries over into embedded systems, such as A                                                             
-                                                                                                                            ndroid and OpenWRT, but it’s up to you to discover the diffe                                                             
-                                                                                                                            rences on those platforms.                                                                                               
+sqlite> select VolumeID, ContentID, Text, Annotation, UserID, Type from Bookmark where VolumeID = "file:///mnt/onboard/Harari, Yuval Noah/Sapiens_ A Brief History of Humankind - Yuval Noah Harari.kepub.epub";
+VolumeID                                                      ContentID                                                     Text                                                          Annotation    UserID                                Type     
+------------------------------------------------------------  ------------------------------------------------------------  ------------------------------------------------------------  ------------  ------------------------------------  ---------
+file:///mnt/onboard/Harari, Yuval Noah/Sapiens_ A Brief Hist  /mnt/onboard/Harari, Yuval Noah/Sapiens_ A Brief History of   ABOUT 13.5 BILLION YEARS AGO, MATTER, energy, time and space                d5e94a94-bc32-4b48-b229-6de0c8e31665  highlight
+ory of Humankind - Yuval Noah Harari.kepub.epub               Humankind - Yuval Noah Harari.kepub.epub!!OEBPS/Hara_9780771   came into being in what is known as the Big Bang. The story                                                               
+                                                              038525_epub_c01_r1.htm                                         of these fundamental features of our universe is called phy                                                               
+                                                                                                                            sics.                                                                                                                      
 
-file:///mnt/onboard/Ward, Brian/How Linux Works - Brian Ward  /mnt/onboard/Ward, Brian/How Linux Works - Brian Ward.kepub.  The $ is the prompt for a regular user account. If you see a              d5e94a94-bc32-4b48-b229-6de0c8e31665  highlight
-.kepub.epub                                                   epub!OPS!f06.xhtml#h1-500402f06-0005                           # as a prompt, you need to be superuser.                                                                                
-sqlite> select VolumeID, ContentID, Text, Annotation, UserID, Type from Bookmark where VolumeID = "file:///mnt/onboard/Ward, Brian/How Linux Works - Brian Ward.kepub.epub" and Type = "note" limit 2; 
-VolumeID                                                      ContentID                                                     Text                                                          Annotation                                                    UserID                                Type
-------------------------------------------------------------  ------------------------------------------------------------  ------------------------------------------------------------  ------------------------------------------------------------  ------------------------------------  ----
-file:///mnt/onboard/Ward, Brian/How Linux Works - Brian Ward  /mnt/onboard/Ward, Brian/How Linux Works - Brian Ward.kepub.  Each piece of time—called a time slice—gives a process enoug  What would be a "task" in this context?                       d5e94a94-bc32-4b48-b229-6de0c8e31665  note
-.kepub.epub                                                   epub!OPS!c01.xhtml#h2-500402c01-0001                          h time for significant computation (and indeed, a process of                                                                                                          
-                                                                                                                            ten finishes its current task during a single slice). Howeve                                                                                                          
-                                                                                                                            r, because the slices are so small, humans can’t perceive th                                                                                                          
-                                                                                                                            em, and the system appears to be running multiple processes                                                                                                           
-                                                                                                                            at the same time (a capability known as multitasking).                                                                                                                
-
-file:///mnt/onboard/Ward, Brian/How Linux Works - Brian Ward  /mnt/onboard/Ward, Brian/How Linux Works - Brian Ward.kepub.  When a process calls fork(), the kernel creates a nearly ide  Same memory & code, parent & child. When child finishes, par  d5e94a94-bc32-4b48-b229-6de0c8e31665  note
-.kepub.epub                                                   epub!OPS!c01.xhtml#h2-500402c01-0004                          ntical copy of the process.                                   ent takes over. Child usually replaced w exec. See graphic                                              
-sqlite> 
+file:///mnt/onboard/Harari, Yuval Noah/Sapiens_ A Brief Hist  /mnt/onboard/Harari, Yuval Noah/Sapiens_ A Brief History of   About 3.8 billion years ago, on a planet called Earth, certa  Test thought  d5e94a94-bc32-4b48-b229-6de0c8e31665  note     
+ory of Humankind - Yuval Noah Harari.kepub.epub               Humankind - Yuval Noah Harari.kepub.epub!!OEBPS/Hara_9780771  in molecules combined to form particularly large and intrica                                                               
+                                                              038525_epub_c01_r1.htm                                        te structures called organisms. The story of organisms is ca                                                               
+                                                                                                                            lled biology.                                                                                                              
+sqlite>
 ```
 There are additional fields which seem to represent the annotation location in tandem with `ContentID` which I will select and display below:
 ```
-sqlite> select VolumeID, ContentID, StartContainerPath, StartContainerChildIndex, StartOffset, EndContainerPath, EndContainerChildIndex, EndOffset, ChapterProgress from Bookmark where VolumeID = "file:///mnt/onboard/Ward, Brian/How Linux Works - Brian Ward.kepub.epub" and Type = "highlight" limit 2;
-VolumeID                                                      ContentID                                                     StartContainerPath  StartContainerChildIndex  StartOffset  EndContainerPath  EndContainerChildIndex  EndOffset  ChapterProgress  
-------------------------------------------------------------  ------------------------------------------------------------  ------------------  ------------------------  -----------  ----------------  ----------------------  ---------  -----------------
-file:///mnt/onboard/Ward, Brian/How Linux Works - Brian Ward  /mnt/onboard/Ward, Brian/How Linux Works - Brian Ward.kepub.  span#kobo\.35\.2    -99                       84           span#kobo\.35\.5  -99                     164        0.666666666666667
-.kepub.epub                                                   epub!OPS!f06.xhtml#h1-500402f06-0005                                                                                                                                                           
+sqlite> select VolumeID, ContentID, StartContainerPath, StartContainerChildIndex, StartOffset, EndContainerPath, EndContainerChildIndex, EndOffset, ChapterProgress from Bookmark where VolumeID = "file:///mnt/onboard/Harari, Yuval Noah/Sapiens_ A Brief History of Humankind - Yuval Noah Harari.kepub.epub";
+VolumeID                                                      ContentID                                                     StartContainerPath  StartContainerChildIndex  StartOffset  EndContainerPath  EndContainerChildIndex  EndOffset  ChapterProgress
+------------------------------------------------------------  ------------------------------------------------------------  ------------------  ------------------------  -----------  ----------------  ----------------------  ---------  ---------------
+file:///mnt/onboard/Harari, Yuval Noah/Sapiens_ A Brief Hist  /mnt/onboard/Harari, Yuval Noah/Sapiens_ A Brief History of   span#kobo\.3\.1     -99                       0            span#kobo\.4\.1   -99                     0          0.05           
+ory of Humankind - Yuval Noah Harari.kepub.epub               Humankind - Yuval Noah Harari.kepub.epub!!OEBPS/Hara_9780771                                                                                                                                 
+                                                              038525_epub_c01_r1.htm                                                                                                                                                                       
 
-file:///mnt/onboard/Ward, Brian/How Linux Works - Brian Ward  /mnt/onboard/Ward, Brian/How Linux Works - Brian Ward.kepub.  span#kobo\.21\.2    -99                       0            span#kobo\.25\.1  -99                     39         0.666666666666667
-.kepub.epub                                                   epub!OPS!f06.xhtml#h1-500402f06-0005                                                                                                                                                           
-sqlite> select VolumeID, ContentID, StartContainerPath, StartContainerChildIndex, StartOffset, EndContainerPath, EndContainerChildIndex, EndOffset, ChapterProgress from Bookmark where VolumeID = "file:///mnt/onboard/Ward, Brian/How Linux Works - Brian Ward.kepub.epub" and Type = "note" limit 2;
-VolumeID                                                      ContentID                                                     StartContainerPath  StartContainerChildIndex  StartOffset  EndContainerPath   EndContainerChildIndex  EndOffset  ChapterProgress  
-------------------------------------------------------------  ------------------------------------------------------------  ------------------  ------------------------  -----------  -----------------  ----------------------  ---------  -----------------
-file:///mnt/onboard/Ward, Brian/How Linux Works - Brian Ward  /mnt/onboard/Ward, Brian/How Linux Works - Brian Ward.kepub.  span#kobo\.100\.1   -99                       0            span#kobo\.105\.1  -99                     0          0.526315789473684
-.kepub.epub                                                   epub!OPS!c01.xhtml#h2-500402c01-0001                                                                                                                                                            
-
-file:///mnt/onboard/Ward, Brian/How Linux Works - Brian Ward  /mnt/onboard/Ward, Brian/How Linux Works - Brian Ward.kepub.  span#kobo\.152\.1   -99                       1            span#kobo\.154\.1  -99                     60         0.684210526315789
-.kepub.epub                                                   epub!OPS!c01.xhtml#h2-500402c01-0004                                                                                                                                                            
+file:///mnt/onboard/Harari, Yuval Noah/Sapiens_ A Brief Hist  /mnt/onboard/Harari, Yuval Noah/Sapiens_ A Brief History of   span#kobo\.5\.1     -99                       0            span#kobo\.5\.2   -99                     41         0.05           
+ory of Humankind - Yuval Noah Harari.kepub.epub               Humankind - Yuval Noah Harari.kepub.epub!!OEBPS/Hara_9780771                                                                                                                                 
+                                                              038525_epub_c01_r1.htm                                                                                                                                                                       
 sqlite>
 ```
 
-Here are the same `Bookmark` fields selected for a CWA-loaded book:
+Here are the same `Bookmark` fields selected for a CWA-loaded book. I highlightex the exact same portion of text for these bookmarks. Even though the ePubs and highlights are the same, the `EndContainerPath` and `EndOffset` slightly differ suggesting the `Bookmark` entries aren't interchangable between books.
 ```
-```
-TODO use sapiens highlights bc the notes are in the same place for both the sideloaded & CWA loaded variations. Test if I can move the annotation for sideloaded book to CWA book by just changing the couple IDs
+sqlite> select VolumeID, ContentID, Text, Annotation, UserID, Type from Bookmark where VolumeID = "b38b4bbb-3751-4d27-a4fa-ecd3c19188ee";
+VolumeID                              ContentID                                                     Text                                                          Annotation    UserID                                Type     
+------------------------------------  ------------------------------------------------------------  ------------------------------------------------------------  ------------  ------------------------------------  ---------
+b38b4bbb-3751-4d27-a4fa-ecd3c19188ee  b38b4bbb-3751-4d27-a4fa-ecd3c19188ee!!OEBPS/Hara_97807710385  ABOUT 13.5 BILLION YEARS AGO, MATTER, energy, time and space                d5e94a94-bc32-4b48-b229-6de0c8e31665  highlight
+                                      25_epub_c01_r1.htm                                             came into being in what is known as the Big Bang. The story                                                               
+                                                                                                     of these fundamental features of our universe is called phy                                                               
+                                                                                                    sics.                                                                                                                      
 
+b38b4bbb-3751-4d27-a4fa-ecd3c19188ee  b38b4bbb-3751-4d27-a4fa-ecd3c19188ee!!OEBPS/Hara_97807710385  About 3.8 billion years ago, on a planet called Earth, certa  Test thought  d5e94a94-bc32-4b48-b229-6de0c8e31665  note     
+                                      25_epub_c01_r1.htm                                            in molecules combined to form particularly large and intrica                                                               
+                                                                                                    te structures called organisms. The story of organisms is ca                                                               
+                                                                                                    lled biology.                                                                                                              
+sqlite> select VolumeID, ContentID, StartContainerPath, StartContainerChildIndex, StartOffset, EndContainerPath, EndContainerChildIndex, EndOffset, ChapterProgress from Bookmark where VolumeID = "b38b4bbb-3751-4d27-a4fa-ecd3c19188ee";
+VolumeID                              ContentID                                                     StartContainerPath  StartContainerChildIndex  StartOffset  EndContainerPath  EndContainerChildIndex  EndOffset  ChapterProgress
+------------------------------------  ------------------------------------------------------------  ------------------  ------------------------  -----------  ----------------  ----------------------  ---------  ---------------
+b38b4bbb-3751-4d27-a4fa-ecd3c19188ee  b38b4bbb-3751-4d27-a4fa-ecd3c19188ee!!OEBPS/Hara_97807710385  span#kobo\.3\.1     -99                       0            span#kobo\.3\.2   -99                     74         0.05           
+                                      25_epub_c01_r1.htm                                                                                                                                                                           
+
+b38b4bbb-3751-4d27-a4fa-ecd3c19188ee  b38b4bbb-3751-4d27-a4fa-ecd3c19188ee!!OEBPS/Hara_97807710385  span#kobo\.5\.1     -99                       0            span#kobo\.5\.2   -99                     41         0.05           
+                                      25_epub_c01_r1.htm                                                                                                                                                                           
+sqlite> 
+```
 
 ## ePub File Locations on Kobo
 
@@ -400,3 +401,21 @@ drwx------  1 jordan  staff    8192 Jan 12 10:24 ..
 ```
 
 ## `Shelf` & `ShelfContent` Tables
+
+```
+sqlite> select * from ShelfContent;
+ShelfName   ContentId                             DateModified          _IsDeleted  _IsSynced
+----------  ------------------------------------  --------------------  ----------  ---------
+Admin Sync  f95adcc1-8251-4127-a5c3-ff0d2f085862  2026-01-09T19:09:26Z  false       true     
+Admin Sync  496b083a-a29b-46ca-8712-ce633e847c0d  2026-01-09T19:09:26Z  false       true     
+Admin Sync  f6ddfd47-9b66-4cd7-ab60-e478aa5e92a9  2026-01-09T19:09:26Z  false       true     
+Admin Sync  9af831fe-e23c-4c9e-8d41-78fab2ace4c6  2026-01-09T19:09:26Z  false       true     
+Admin Sync  e63be623-0080-44d9-8585-b68724aea685  2026-01-09T19:09:26Z  false       true     
+Admin Sync  2ca85ca8-d580-493e-94b8-3a62f7b00c0f  2026-01-09T19:09:26Z  false       true     
+Admin Sync  e59aa8b4-2103-4e77-97a8-37b406beaf22  2026-01-09T19:09:26Z  false       true     
+Admin Sync  6f03d308-6370-4dc6-935b-2aede5cc81c3  2026-01-09T19:09:26Z  false       true     
+sqlite> select * from Shelf;
+CreationDate          Id                                    InternalName  LastModified          Name        Type     _IsDeleted  _IsVisible  _IsSynced  _SyncTime             LastAccessed        
+--------------------  ------------------------------------  ------------  --------------------  ----------  -------  ----------  ----------  ---------  --------------------  --------------------
+2026-01-09T18:43:14Z  c2329f55-2e57-4e3f-a87b-46aeb6cb8981  Admin Sync    2026-01-09T18:43:14Z  Admin Sync  UserTag  false       true        true       2026-01-09T20:20:12Z  2026-01-09T18:43:14Z
+```

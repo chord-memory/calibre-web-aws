@@ -3,7 +3,7 @@ set -euo pipefail
 
 source .env
 
-REPO_DIR="../calibre-web-automated"
+REPO_DIR="../../calibre-web-automated"
 REPO_URL="https://github.com/crocodilestick/Calibre-Web-Automated.git"
 
 # Clone only if it doesn't exist

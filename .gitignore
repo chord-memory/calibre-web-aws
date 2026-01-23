@@ -1,5 +1,6 @@
 .DS_Store
 .env
+.venv
 local/config
 local/ingest
 local/library
@@ -8,3 +9,5 @@ terraform/terraform.tfvars
 terraform/.terraform/
 terraform/.terraform*
 terraform/terraform.tfstate*
+__pycache__/
+.pytest_cache/

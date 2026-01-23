@@ -206,7 +206,7 @@ Execute:
 aws sso login --profile jordan-sso
 export AWS_PROFILE=jordan-sso
 # Run script (Use EC2 ID)
-./sync.sh library i-xxxxxxxx
+./scripts/sync.sh library i-xxxxxxxx
 ```
 
 Your books should now be visible in the Calibe-Web-Automated UI in AWS. There is no longer any need to continue using Calibre desktop.
@@ -235,7 +235,7 @@ If you have already synced your Kobo with a local Calibre-Web and just deployed 
   aws sso login --profile jordan-sso
   export AWS_PROFILE=jordan-sso
   # Run script (Use EC2 ID)
-  ./sync.sh config i-xxxxxxxx
+  ./scripts/sync.sh config i-xxxxxxxx
   ```
   Continue with steps below for Kobo Sync Setup. Some steps may be skipped. For example, Kobo Sync should already be turned on, because your configurations were copied from local Calibre-Web to AWS Calibre-Web. Essentially you will just change "Server External Port" from 8083 to 80 and add your new Kobo Sync Token to your Kobo configuration file.
 </details><br>
@@ -276,6 +276,37 @@ Steps:
 Books from Calibre-Web-Automated and will be synced to Kobo when "Sync Now" is clicked and the progress % for these books synced to Calibre-Web-Automated upon opening/closing the books on the Kobo.
 
 **⚠️ Note that any sideloaded books synced from Calibre desktop to the Kobo will be duplicated on the Kobo upon syncing ⚠️**.
+
+Example script output
+```
+jordan@Jordans-MacBook-Pro calibre-web-aws % make kobo-migrate
+.venv/bin/pip install -r requirements.txt
+Requirement already satisfied: boto3==1.42.32 in ./.venv/lib/python3.11/site-packages (from -r requirements.txt (line 1)) (1.42.32)
+Requirement already satisfied: botocore<1.43.0,>=1.42.32 in ./.venv/lib/python3.11/site-packages (from boto3==1.42.32->-r requirements.txt (line 1)) (1.42.32)
+Requirement already satisfied: jmespath<2.0.0,>=0.7.1 in ./.venv/lib/python3.11/site-packages (from boto3==1.42.32->-r requirements.txt (line 1)) (1.1.0)
+Requirement already satisfied: s3transfer<0.17.0,>=0.16.0 in ./.venv/lib/python3.11/site-packages (from boto3==1.42.32->-r requirements.txt (line 1)) (0.16.0)
+Requirement already satisfied: python-dateutil<3.0.0,>=2.1 in ./.venv/lib/python3.11/site-packages (from botocore<1.43.0,>=1.42.32->boto3==1.42.32->-r requirements.txt (line 1)) (2.9.0.post0)
+Requirement already satisfied: urllib3!=2.2.0,<3,>=1.25.4 in ./.venv/lib/python3.11/site-packages (from botocore<1.43.0,>=1.42.32->boto3==1.42.32->-r requirements.txt (line 1)) (2.6.3)
+Requirement already satisfied: six>=1.5 in ./.venv/lib/python3.11/site-packages (from python-dateutil<3.0.0,>=2.1->botocore<1.43.0,>=1.42.32->boto3==1.42.32->-r requirements.txt (line 1)) (1.17.0)
+
+[notice] A new release of pip available: 22.3.1 -> 25.3
+[notice] To update, run: python3.11 -m pip install --upgrade pip
+.venv/bin/python ./scripts/kobo/migrate.py \
+                --kobo-db /Volumes/KOBOeReader/.kobo/KoboReader.sqlite \
+                --instance i-0932ed6e3c5f988ae \
+                --title "Flash Boys: A Wall Street Revolt" \
+                --shelf "Test Sync 1" \
+                --dry-run
+Found 1 sideloaded candidates
+CONVERT: Flash Boys: A Wall Street Revolt
+  file:///mnt/onboard/Lewis, Michael/Flash Boys_ A Wall Street Revolt - Michael Lewis.kepub.epub → a03c5556-cb85-4f42-ac08-bfc308705b7f
+NOTE: Will add books to existing shelf 'Test Sync 1'
+
+Proceed with dry-run? [y/N]y
+
+DRY RUN COMPLETE — no changes written
+jordan@Jordans-MacBook-Pro calibre-web-aws %
+```
 
 <details>
   <summary>See details to safely transition from Calibre desktop to Calibre-Web:</summary><br>
@@ -400,7 +431,7 @@ TODO (just move file to ingest directory locally, run script for copying to EBS)
 * Cannot use KoboUtilities edit book metadata & cover bc Calibre-Web loaded book will not be recognized by Calibre desktop on Kobo if book metadata & cover are edited in Calibre desktop
 * When [this PR](https://github.com/janeczku/calibre-web/pull/3381) is merged then book metadata & cover can be edited in Calibre desktop followed by aws s3/ebs sync and "Sync Now" on Kobo
 
-^^^ In progress. Annotations should hopefully be on the fly updated to metadata.db or elsewhere viewable by CWA so Calibre Desktop will not be used. Books downloaded from downloader (TODO) or ./sync.sh ingest (TODO)
+^^^ In progress. Annotations should hopefully be on the fly updated to metadata.db or elsewhere viewable by CWA so Calibre Desktop will not be used. Books downloaded from downloader (TODO) or ./scripts/sync.sh ingest (TODO)
 
 ## Build CWA Image
 

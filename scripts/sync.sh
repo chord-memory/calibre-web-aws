@@ -121,7 +121,7 @@ elif [[ "$TARGET" == "ingest" ]]; then
   echo "Ingest sync complete."
 
 elif [[ "$TARGET" == "config" ]]; then
-  LOCAL_PATH=./local/config/app.db
+  LOCAL_PATH=../local/config/app.db
   read -p "Local path [$LOCAL_PATH]: " INPUT_PATH
   LOCAL_PATH=${INPUT_PATH:-$LOCAL_PATH}
 
