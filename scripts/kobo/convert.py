@@ -1,3 +1,13 @@
+"""
+The purpose of this script is to trick the Kobo into believing
+sideloaded books on a Kobo have been CWA-loaded so that the Kobo
+begins syncing reading progress %, annotations, etc with CWA, &
+preventing CWA from duplicating sideloaded books during sync if
+the sideloaded book also appears in CWA library.
+
+NOTE: See KoboNotes.md explaining why this doesn't really work.
+"""
+
 import sys
 import sqlite3
 import argparse
@@ -233,7 +243,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--kobo-db", required=True, help="path to KoboReader.sqlite on Kobo")
     parser.add_argument("--instance", dest="instance_id", required=True, help="EC2 instance id where CWA is running")
-    parser.add_argument("--title", required=True, help="title of book to migrate or 'all'")
+    parser.add_argument("--title", required=True, help="title of book to convert or 'all'")
     parser.add_argument("--shelf", required=True, help="name of CWA shelf to sync to Kobo")
     parser.add_argument("--yes", dest="assume_yes", action="store_true", help="skip confirmation")
     parser.add_argument("--dry-run", action="store_true", help="echo results without committing to DB")

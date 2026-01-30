@@ -419,3 +419,333 @@ CreationDate          Id                                    InternalName  LastMo
 --------------------  ------------------------------------  ------------  --------------------  ----------  -------  ----------  ----------  ---------  --------------------  --------------------
 2026-01-09T18:43:14Z  c2329f55-2e57-4e3f-a87b-46aeb6cb8981  Admin Sync    2026-01-09T18:43:14Z  Admin Sync  UserTag  false       true        true       2026-01-09T20:20:12Z  2026-01-09T18:43:14Z
 ```
+
+## Intention: Trick Kobo to Think Sideloaded Books Came from CWA
+
+The intention of this work was to trick the Kobo into thinking that sideloaded books actually were loaded via CWA Kobo Sync feature. I wrote a script to edit the books primary key on the Kobo from the filesystem based ID to the CWA UUID that would usually be assigned to the book when it is synced. I edited some other fields as well so the sideloaded book as represented in the Kobo database would mimic a CWA loaded book. The hope was that upon clicking "Sync Now" on the Kobo, CWA would recongize the book as having already been downloaded, and instead things like the reading progress % and annotations would begin syncing up to CWA. Instead, the book would still be duplicated onto the device. I considered playing around with different boolean values e.g. editing the variuos `Synced` booleans from false to true or editing more values in the CWA database so the book appeared to CWA as already having been synced. The additional hurdle, however, was that upon editing the DB to switch the primary key, and then ejecting the Kobo, the Kobo would reload content, notice that there is a sideloaded book without a sideloaded style primary key, and reload the book into its database, duplicating the book. So, even if I was able to get CWA to recognize the book as having already been downloaded, the Kobo would duplicate the book, posing a new user experience problem on the eReader itself. I am going to switch directions to moving annotations from sideloaded books to CWA loaded books, and then deleting the sideloaded books.
+
+### `convert.py` Script output
+
+```
+jordan@Jordans-MacBook-Pro calibre-web-aws % make kobo-migrate
+.venv/bin/pip install -r requirements.txt
+Requirement already satisfied: boto3==1.42.32 in ./.venv/lib/python3.11/site-packages (from -r requirements.txt (line 1)) (1.42.32)
+Requirement already satisfied: botocore<1.43.0,>=1.42.32 in ./.venv/lib/python3.11/site-packages (from boto3==1.42.32->-r requirements.txt (line 1)) (1.42.32)
+Requirement already satisfied: jmespath<2.0.0,>=0.7.1 in ./.venv/lib/python3.11/site-packages (from boto3==1.42.32->-r requirements.txt (line 1)) (1.1.0)
+Requirement already satisfied: s3transfer<0.17.0,>=0.16.0 in ./.venv/lib/python3.11/site-packages (from boto3==1.42.32->-r requirements.txt (line 1)) (0.16.0)
+Requirement already satisfied: python-dateutil<3.0.0,>=2.1 in ./.venv/lib/python3.11/site-packages (from botocore<1.43.0,>=1.42.32->boto3==1.42.32->-r requirements.txt (line 1)) (2.9.0.post0)
+Requirement already satisfied: urllib3!=2.2.0,<3,>=1.25.4 in ./.venv/lib/python3.11/site-packages (from botocore<1.43.0,>=1.42.32->boto3==1.42.32->-r requirements.txt (line 1)) (2.6.3)
+Requirement already satisfied: six>=1.5 in ./.venv/lib/python3.11/site-packages (from python-dateutil<3.0.0,>=2.1->botocore<1.43.0,>=1.42.32->boto3==1.42.32->-r requirements.txt (line 1)) (1.17.0)
+
+[notice] A new release of pip available: 22.3.1 -> 25.3
+[notice] To update, run: python3.11 -m pip install --upgrade pip
+.venv/bin/python ./scripts/kobo/migrate.py \
+                --kobo-db /Volumes/KOBOeReader/.kobo/KoboReader.sqlite \
+                --instance i-0932ed6e3c5f988ae \
+                --title "Flash Boys: A Wall Street Revolt" \
+                --shelf "Test Sync 1" \
+                --dry-run
+Found 1 sideloaded candidates
+CONVERT: Flash Boys: A Wall Street Revolt
+  file:///mnt/onboard/Lewis, Michael/Flash Boys_ A Wall Street Revolt - Michael Lewis.kepub.epub → a03c5556-cb85-4f42-ac08-bfc308705b7f
+NOTE: Will add books to existing shelf 'Test Sync 1'
+
+Proceed with dry-run? [y/N]y
+
+DRY RUN COMPLETE — no changes written
+jordan@Jordans-MacBook-Pro calibre-web-aws %
+```
+
+## New Intention: Transfer State from Sideloaded Books -> CWA-loaded Books
+
+Above I already have outlined which tables have relationships with the `content` table i.e. which tables store state related to the ePub files loaded onto the Kobo. Below I will outline the fields which investigated before deciding which fields to transfer from my sideloaded to my CWA-loaded books.
+
+### `content` Table
+
+The fields below will only be transferred for the main book entry. The subentries are either all `null`/0 for these fields or are not going to be tranferred for the following reasons:
+
+* `FirstTimeReading` → Only ever `true` for subentries so no need to transfer
+* `ChapterIDBookmarked` → Not related to reading state in subentries; see details below
+
+| Field                     | Meaning                                                                                                                        | Transfer Status   |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------| ----------------- |
+| `DateLastRead`            | Date the ePub was most recently opened on the Kobo                                                                             | Transfer        |
+| `FirstTimeReading`        | Boolean indicating whether the book is being read for the first time                                                           | Transfer        |
+| `ChapterIDBookmarked`     | Current reading location                                                                                                       | Transfer        |
+| `ParagraphBookmarked`     | All observed values are `0`                                                                                                    | Do not transfer |
+| `BookmarkWordOffset`      | All observed values are `0`                                                                                                    | Do not transfer |
+| `ReadStatus`              | Integer (`0`, `1`, or `2`) representing read state                                                                             | Transfer        |
+| `___PercentRead`          | Current reading progress as an integer percentage                                                                              | Transfer        |
+| `RestOfBookEstimate`      | Estimated number of seconds remaining to finish the book                                                                       | Transfer        |
+| `CurrentChapterEstimate`  | Estimated number of seconds remaining to finish the current chapter                                                            | Transfer        |
+| `CurrentChapterProgress`  | Progress through the current chapter as a float percentage                                                                     | Transfer        |
+| `TimesStartedReading`     | Number of times the book has been started; `null` for sideloaded books; auto-populate as `1` when `___PercentRead` is non-zero | Auto-managed    |
+| `TimeSpentReading`        | Total time spent reading the book, in seconds                                                                                  | Transfer        |
+| `LastTimeStartedReading`  | Datetime when the book was last started; `null` for sideloaded books                                                           | Leave as-is     |
+| `LastTimeFinishedReading` | Datetime when the book was last finished; `null` for sideloaded books                                                          | Leave as-is     |
+
+### `ChapterIDBookmarked` Investigation
+
+Here you can see the `ChapterIDBookmarked` for the main book entries of a sideloaded book next to a CWA-loaded book. The `ChapterIDBookmarked` field itself doesn't contain the `ContentID` so it is directly transferrable.
+```
+sqlite> select a.ContentID, a.ChapterIDBookmarked, b.ContentID, b.ChapterIDBookmarked from content as a join content as b on a.Title = b.Title and a.ContentID < b.ContentID where a.Title = "Bird by Bird: Some Instructions on Writing and Life";
+ContentID                             ChapterIDBookmarked             ContentID                                                     ChapterIDBookmarked          
+------------------------------------  ------------------------------  ------------------------------------------------------------  -----------------------------
+f6ddfd47-9b66-4cd7-ab60-e478aa5e92a9  index_split_004.html#kobo.49.3  file:///mnt/onboard/Lamott, Anne/Bird by Bird_ Some Instruct  index_split_015.html#kobo.1.1
+                                                                      ions on Writing and Life - Anne Lamott.kepub.epub                                          
+```
+For the subentries I used more complicated queries to align each subentry for a sideloaded book next to each entry for a CWA-loaded book, aligned by their `VolumeIndex` in `volume_shortcovers`. And also aligned by `VolumeIndex` in `content` for those subentries in `content` where the `ContentID` did not appear as a `ShortcoverID` in `volume_shortcovers`. I am not sure why only 1/2 of the subentries from content appear in `volume_shortcovers`, nor why these 1/2 have `ChapterIDBookmarked` and the other 1/2 don't.
+
+For the 2nd example below, many more subentries did not appear in `volume_shortcovers` than did, but similarly, only these had `ChapterIDBookmarked` values. Also to note, it seems that the `ChapterIDBookmarked` for the subentries not in `volume_shortcovers` always equals a `ContentID` for a subentry that is in `volume_shortcovers`.
+
+It seems clear that the `ChapterIDBookmarked` data serve to map files but not store reading state for subentries so I will not worry about transferring this field for subentires.
+
+Query selecting subentries & chapter IDs in `volume_shortcovers`:
+```
+WITH main_books AS (
+    SELECT ContentID
+    FROM content
+    WHERE Title = 'Bird by Bird: Some Instructions on Writing and Life'
+      AND BookID IS NULL
+),
+subentries AS (
+    SELECT
+        c.BookID,
+        c.ContentID,
+        c.ChapterIDBookmarked,
+        vs.VolumeIndex
+    FROM content AS c
+    JOIN volume_shortcovers AS vs
+      ON c.ContentID = vs.ShortcoverId
+    WHERE c.BookID IN (SELECT ContentID FROM main_books)
+)
+SELECT
+    a.VolumeIndex,
+    a.ContentID             AS book1_subentry_id,
+    a.ChapterIDBookmarked   AS book1_chapter,
+    b.ContentID             AS book2_subentry_id,
+    b.ChapterIDBookmarked   AS book2_chapter
+FROM subentries AS a
+JOIN subentries AS b
+  ON a.VolumeIndex = b.VolumeIndex
+ AND a.BookID < b.BookID
+ORDER BY a.VolumeIndex;
+```
+```
+VolumeIndex  book1_subentry_id                                           book1_chapter  book2_subentry_id                                             book2_chapter
+-----------  ----------------------------------------------------------  -------------  ------------------------------------------------------------  -------------
+0            f6ddfd47-9b66-4cd7-ab60-e478aa5e92a9!!titlepage.xhtml                      /mnt/onboard/Lamott, Anne/Bird by Bird_ Some Instructions on               
+                                                                                         Writing and Life - Anne Lamott.kepub.epub!!titlepage.xhtml                
+
+1            f6ddfd47-9b66-4cd7-ab60-e478aa5e92a9!!index_split_000.html                 /mnt/onboard/Lamott, Anne/Bird by Bird_ Some Instructions on               
+                                                                                         Writing and Life - Anne Lamott.kepub.epub!!index_split_000.               
+                                                                                        html                                                                       
+
+2            f6ddfd47-9b66-4cd7-ab60-e478aa5e92a9!!index_split_001.html                 /mnt/onboard/Lamott, Anne/Bird by Bird_ Some Instructions on               
+                                                                                         Writing and Life - Anne Lamott.kepub.epub!!index_split_001.               
+                                                                                        html                                                                       
+
+...
+
+40           f6ddfd47-9b66-4cd7-ab60-e478aa5e92a9!!index_split_039.html                 /mnt/onboard/Lamott, Anne/Bird by Bird_ Some Instructions on               
+                                                                                         Writing and Life - Anne Lamott.kepub.epub!!index_split_039.               
+                                                                                        html                                                                       
+
+41           f6ddfd47-9b66-4cd7-ab60-e478aa5e92a9!!index_split_040.html                 /mnt/onboard/Lamott, Anne/Bird by Bird_ Some Instructions on               
+                                                                                         Writing and Life - Anne Lamott.kepub.epub!!index_split_040.               
+                                                                                        html                                                                       
+
+42           f6ddfd47-9b66-4cd7-ab60-e478aa5e92a9!!index_split_041.html                 /mnt/onboard/Lamott, Anne/Bird by Bird_ Some Instructions on               
+                                                                                         Writing and Life - Anne Lamott.kepub.epub!!index_split_041.               
+                                                                                        html                                                                       
+```
+```
+VolumeIndex  book1_subentry_id                                     book1_chapter  book2_subentry_id                                             book2_chapter
+-----------  ----------------------------------------------------  -------------  ------------------------------------------------------------  -------------
+0            6f03d308-6370-4dc6-935b-2aede5cc81c3!OPS!cover.xhtml                 /mnt/onboard/Ward, Brian/How Linux Works - Brian Ward.kepub.               
+                                                                                  epub!OPS!cover.xhtml                                                       
+
+1            6f03d308-6370-4dc6-935b-2aede5cc81c3!OPS!toc.xhtml                   /mnt/onboard/Ward, Brian/How Linux Works - Brian Ward.kepub.               
+                                                                                  epub!OPS!toc.xhtml                                                         
+
+2            6f03d308-6370-4dc6-935b-2aede5cc81c3!OPS!f01.xhtml                   /mnt/onboard/Ward, Brian/How Linux Works - Brian Ward.kepub.               
+                                                                                  epub!OPS!f01.xhtml                                                         
+
+...
+
+24           6f03d308-6370-4dc6-935b-2aede5cc81c3!OPS!c17.xhtml                   /mnt/onboard/Ward, Brian/How Linux Works - Brian Ward.kepub.               
+                                                                                  epub!OPS!c17.xhtml                                                         
+
+25           6f03d308-6370-4dc6-935b-2aede5cc81c3!OPS!b01.xhtml                   /mnt/onboard/Ward, Brian/How Linux Works - Brian Ward.kepub.               
+                                                                                  epub!OPS!b01.xhtml                                                         
+
+26           6f03d308-6370-4dc6-935b-2aede5cc81c3!OPS!b02.xhtml                   /mnt/onboard/Ward, Brian/How Linux Works - Brian Ward.kepub.               
+                                                                                  epub!OPS!b02.xhtml                                                         
+```
+
+Query selecting subentries & chapter IDs not in `volume_shortcovers`:
+```
+WITH main_books AS (
+    SELECT ContentID
+    FROM content
+    WHERE Title = 'Bird by Bird: Some Instructions on Writing and Life'
+      AND BookID IS NULL
+),
+non_shortcover_subentries AS (
+    SELECT
+        c.BookID,
+        c.ContentID,
+        c.ChapterIDBookmarked,
+        c.VolumeIndex
+    FROM content AS c
+    LEFT JOIN volume_shortcovers AS vs
+      ON c.ContentID = vs.ShortcoverId
+    WHERE c.BookID IN (SELECT ContentID FROM main_books)
+      AND vs.ShortcoverId IS NULL
+)
+SELECT
+    a.VolumeIndex,
+    a.ContentID             AS book1_subentry_id,
+    a.ChapterIDBookmarked   AS book1_chapter,
+    b.ContentID             AS book2_subentry_id,
+    b.ChapterIDBookmarked   AS book2_chapter
+FROM non_shortcover_subentries AS a
+JOIN non_shortcover_subentries AS b
+  ON a.VolumeIndex = b.VolumeIndex
+ AND a.BookID < b.BookID
+ORDER BY a.VolumeIndex;
+```
+```
+VolumeIndex  book1_subentry_id                                             book1_chapter                                               book2_subentry_id                                             book2_chapter                                               
+-----------  ------------------------------------------------------------  ----------------------------------------------------------  ------------------------------------------------------------  ------------------------------------------------------------
+0            f6ddfd47-9b66-4cd7-ab60-e478aa5e92a9!!titlepage.xhtml-1       f6ddfd47-9b66-4cd7-ab60-e478aa5e92a9!!titlepage.xhtml       /mnt/onboard/Lamott, Anne/Bird by Bird_ Some Instructions on  /mnt/onboard/Lamott, Anne/Bird by Bird_ Some Instructions on
+                                                                                                                                        Writing and Life - Anne Lamott.kepub.epub!!titlepage.xhtml-   Writing and Life - Anne Lamott.kepub.epub!!titlepage.xhtml 
+                                                                                                                                       1                                                                                                                         
+
+1            f6ddfd47-9b66-4cd7-ab60-e478aa5e92a9!!index_split_000.html-1  f6ddfd47-9b66-4cd7-ab60-e478aa5e92a9!!index_split_000.html  /mnt/onboard/Lamott, Anne/Bird by Bird_ Some Instructions on  /mnt/onboard/Lamott, Anne/Bird by Bird_ Some Instructions on
+                                                                                                                                        Writing and Life - Anne Lamott.kepub.epub!!index_split_000.   Writing and Life - Anne Lamott.kepub.epub!!index_split_000.
+                                                                                                                                       html-1                                                        html                                                        
+
+2            f6ddfd47-9b66-4cd7-ab60-e478aa5e92a9!!index_split_002.html-1  f6ddfd47-9b66-4cd7-ab60-e478aa5e92a9!!index_split_002.html  /mnt/onboard/Lamott, Anne/Bird by Bird_ Some Instructions on  /mnt/onboard/Lamott, Anne/Bird by Bird_ Some Instructions on
+                                                                                                                                        Writing and Life - Anne Lamott.kepub.epub!!index_split_002.   Writing and Life - Anne Lamott.kepub.epub!!index_split_002.
+                                                                                                                                       html-1                                                        html                                                        
+
+...
+
+38           f6ddfd47-9b66-4cd7-ab60-e478aa5e92a9!!index_split_039.html-1  f6ddfd47-9b66-4cd7-ab60-e478aa5e92a9!!index_split_039.html  /mnt/onboard/Lamott, Anne/Bird by Bird_ Some Instructions on  /mnt/onboard/Lamott, Anne/Bird by Bird_ Some Instructions on
+                                                                                                                                        Writing and Life - Anne Lamott.kepub.epub!!index_split_039.   Writing and Life - Anne Lamott.kepub.epub!!index_split_039.
+                                                                                                                                       html-1                                                        html                                                        
+
+39           f6ddfd47-9b66-4cd7-ab60-e478aa5e92a9!!index_split_040.html-1  f6ddfd47-9b66-4cd7-ab60-e478aa5e92a9!!index_split_040.html  /mnt/onboard/Lamott, Anne/Bird by Bird_ Some Instructions on  /mnt/onboard/Lamott, Anne/Bird by Bird_ Some Instructions on
+                                                                                                                                        Writing and Life - Anne Lamott.kepub.epub!!index_split_040.   Writing and Life - Anne Lamott.kepub.epub!!index_split_040.
+                                                                                                                                       html-1                                                        html                                                        
+
+40           f6ddfd47-9b66-4cd7-ab60-e478aa5e92a9!!index_split_041.html-1  f6ddfd47-9b66-4cd7-ab60-e478aa5e92a9!!index_split_041.html  /mnt/onboard/Lamott, Anne/Bird by Bird_ Some Instructions on  /mnt/onboard/Lamott, Anne/Bird by Bird_ Some Instructions on
+                                                                                                                                        Writing and Life - Anne Lamott.kepub.epub!!index_split_041.   Writing and Life - Anne Lamott.kepub.epub!!index_split_041.
+                                                                                                                                       html-1                                                        html                                                        
+```
+```
+VolumeIndex  book1_subentry_id                                     book1_chapter                                       book2_subentry_id                                             book2_chapter                                               
+-----------  ----------------------------------------------------  --------------------------------------------------  ------------------------------------------------------------  ------------------------------------------------------------
+0            6f03d308-6370-4dc6-935b-2aede5cc81c3!OPS!f01.xhtml-1  6f03d308-6370-4dc6-935b-2aede5cc81c3!OPS!f01.xhtml  /mnt/onboard/Ward, Brian/How Linux Works - Brian Ward.kepub.  /mnt/onboard/Ward, Brian/How Linux Works - Brian Ward.kepub.
+                                                                                                                       epub!OPS!f01.xhtml-1                                          epub!OPS!f01.xhtml                                          
+
+1            6f03d308-6370-4dc6-935b-2aede5cc81c3!OPS!f02.xhtml-1  6f03d308-6370-4dc6-935b-2aede5cc81c3!OPS!f02.xhtml  /mnt/onboard/Ward, Brian/How Linux Works - Brian Ward.kepub.  /mnt/onboard/Ward, Brian/How Linux Works - Brian Ward.kepub.
+                                                                                                                       epub!OPS!f02.xhtml-1                                          epub!OPS!f02.xhtml                                          
+
+2            6f03d308-6370-4dc6-935b-2aede5cc81c3!OPS!f03.xhtml-1  6f03d308-6370-4dc6-935b-2aede5cc81c3!OPS!f03.xhtml  /mnt/onboard/Ward, Brian/How Linux Works - Brian Ward.kepub.  /mnt/onboard/Ward, Brian/How Linux Works - Brian Ward.kepub.
+                                                                                                                       epub!OPS!f03.xhtml-1                                          epub!OPS!f03.xhtml                                          
+...
+```
+
+### Remaining Tables
+
+`Bookmark`
+`content_settings`
+`Event`
+
+We will duplicate all of the entries in these tables for the Sideloaded books, but replace the field containing the main book entry `ContentID` with the `ContentID` of the equivilant CWA-loaded book. The exception being the `Bookmark` table which contains fields for both the main book entry `ContentID` and the subentry `ContentID`. To deal with this we will also replace the field containing the subentry `ContentID` with the `ContentID` for the equivilant `ContentID` for the CWA-loaded subentry. We generate a map of Sideloaded subentries → CWA-loaded subentries via the `VolumeIndex` of the `volume_shortcovers` table.
+
+`WordList`
+
+For the `WordList` we cannot duplicate entries because the word itself is the primary key for the table. We will instead edit the content ID from the sideloaded ID to the CWA-loaded ID in the existing entries when transferring data. We need to be careful about this because the state for this one table is not duplicated between the sideloaded entry & CWA-loaded entry, so if the transfer script ws executed and then CWA-loaded entry deleted, the words would be lost. The goal is to delete the sideloaded entry after running the transfer script though so hopefully we do not see any problems here.
+
+`Activity`
+
+We will not duplicate the `Activity` entries because for my books at least the `Activity` entries are the same between new CWA-loaded books and used sideloaded books. All "RecentBook" `Type` with an `Action` of 2. The `Enabled` boolean differs but I will ignore that for now.
+
+### Uncertainties
+
+Keeping an eye on the `Activity` `Enabled` field and the `LastTimeStartedReading`/`LastTimeFinishedReading` fields for CWA-loaded books with data transferred from sideloaded books.
+
+### `transfer.py` Script Output
+
+Dry Run for 1 Book
+
+```
+jordan@Jordans-MacBook-Pro calibre-web-aws % make kobo-transfer
+.venv/bin/pip install -r requirements.txt
+Requirement already satisfied: boto3==1.42.32 in ./.venv/lib/python3.11/site-packages (from -r requirements.txt (line 1)) (1.42.32)
+Requirement already satisfied: botocore<1.43.0,>=1.42.32 in ./.venv/lib/python3.11/site-packages (from boto3==1.42.32->-r requirements.txt (line 1)) (1.42.32)
+Requirement already satisfied: jmespath<2.0.0,>=0.7.1 in ./.venv/lib/python3.11/site-packages (from boto3==1.42.32->-r requirements.txt (line 1)) (1.1.0)
+Requirement already satisfied: s3transfer<0.17.0,>=0.16.0 in ./.venv/lib/python3.11/site-packages (from boto3==1.42.32->-r requirements.txt (line 1)) (0.16.0)
+Requirement already satisfied: python-dateutil<3.0.0,>=2.1 in ./.venv/lib/python3.11/site-packages (from botocore<1.43.0,>=1.42.32->boto3==1.42.32->-r requirements.txt (line 1)) (2.9.0.post0)
+Requirement already satisfied: urllib3!=2.2.0,<3,>=1.25.4 in ./.venv/lib/python3.11/site-packages (from botocore<1.43.0,>=1.42.32->boto3==1.42.32->-r requirements.txt (line 1)) (2.6.3)
+Requirement already satisfied: six>=1.5 in ./.venv/lib/python3.11/site-packages (from python-dateutil<3.0.0,>=2.1->botocore<1.43.0,>=1.42.32->boto3==1.42.32->-r requirements.txt (line 1)) (1.17.0)
+
+[notice] A new release of pip available: 22.3.1 -> 25.3
+[notice] To update, run: python3.11 -m pip install --upgrade pip
+.venv/bin/python ./scripts/kobo/transfer.py \
+                --kobo-db /Volumes/KOBOeReader/.kobo/KoboReader.sqlite \
+                --title "Sapiens: A Brief History of Humankind" \
+                --dry-run
+Found 1 sideloaded candidates
+TRANSFER: Sapiens: A Brief History of Humankind
+  file:///mnt/onboard/Harari, Yuval Noah/Sapiens_ A Brief History of Humankind - Yuval Noah Harari.kepub.epub → addbb07e-6742-4b1d-bb5b-a0b62f735ebb
+
+Proceed with dry-run? [y/N] y
+Transferring 'Sapiens: A Brief History of Humankind'
+    Transferring content fields
+    Transferring 2 Bookmark entries
+    Transferring 1 content_settings entries
+    Transferring 5 Event entries
+    Transferring 1 WordList entries
+
+DRY RUN COMPLETE — no changes written
+jordan@Jordans-MacBook-Pro calibre-web-aws %
+```
+
+Real run for 1 book
+
+```
+jordan@Jordans-MacBook-Pro calibre-web-aws % make kobo-transfer
+.venv/bin/pip install -r requirements.txt
+Requirement already satisfied: boto3==1.42.32 in ./.venv/lib/python3.11/site-packages (from -r requirements.txt (line 1)) (1.42.32)
+Requirement already satisfied: botocore<1.43.0,>=1.42.32 in ./.venv/lib/python3.11/site-packages (from boto3==1.42.32->-r requirements.txt (line 1)) (1.42.32)
+Requirement already satisfied: jmespath<2.0.0,>=0.7.1 in ./.venv/lib/python3.11/site-packages (from boto3==1.42.32->-r requirements.txt (line 1)) (1.1.0)
+Requirement already satisfied: s3transfer<0.17.0,>=0.16.0 in ./.venv/lib/python3.11/site-packages (from boto3==1.42.32->-r requirements.txt (line 1)) (0.16.0)
+Requirement already satisfied: python-dateutil<3.0.0,>=2.1 in ./.venv/lib/python3.11/site-packages (from botocore<1.43.0,>=1.42.32->boto3==1.42.32->-r requirements.txt (line 1)) (2.9.0.post0)
+Requirement already satisfied: urllib3!=2.2.0,<3,>=1.25.4 in ./.venv/lib/python3.11/site-packages (from botocore<1.43.0,>=1.42.32->boto3==1.42.32->-r requirements.txt (line 1)) (2.6.3)
+Requirement already satisfied: six>=1.5 in ./.venv/lib/python3.11/site-packages (from python-dateutil<3.0.0,>=2.1->botocore<1.43.0,>=1.42.32->boto3==1.42.32->-r requirements.txt (line 1)) (1.17.0)
+
+[notice] A new release of pip available: 22.3.1 -> 25.3
+[notice] To update, run: python3.11 -m pip install --upgrade pip
+.venv/bin/python ./scripts/kobo/transfer.py \
+                --kobo-db /Volumes/KOBOeReader/.kobo/KoboReader.sqlite \
+                --title "Sapiens: A Brief History of Humankind" \
+
+Found 1 sideloaded candidates
+TRANSFER: Sapiens: A Brief History of Humankind
+  file:///mnt/onboard/Harari, Yuval Noah/Sapiens_ A Brief History of Humankind - Yuval Noah Harari.kepub.epub → addbb07e-6742-4b1d-bb5b-a0b62f735ebb
+
+Proceed with db changes? [y/N] y
+Transferring 'Sapiens: A Brief History of Humankind'
+    Transferring content fields
+    Transferring 2 Bookmark entries
+    Transferring 1 content_settings entries
+    Transferring 5 Event entries
+    Transferring 1 WordList entries
+
+DONE — eject Kobo safely
+jordan@Jordans-MacBook-Pro calibre-web-aws % 
+```

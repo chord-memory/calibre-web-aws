@@ -19,13 +19,20 @@ venv: $(VENV)/bin/activate
 install: venv
 	$(PIP) install -r requirements.txt
 
-.PHONY: kobo-migrate
-kobo-migrate: install
-	$(VENV)/bin/python ./scripts/kobo/migrate.py \
+# .PHONY: kobo-convert
+# kobo-convert: install
+# 	$(VENV)/bin/python ./scripts/kobo/convert.py \
+# 		--kobo-db $(KOBO_DB) \
+# 		--instance $(INSTANCE) \
+# 		--title $(TITLE) \
+# 		--shelf $(SHELF) \
+# 		$(if $(filter true,$(DRY_RUN)),--dry-run)
+
+.PHONY: kobo-transfer
+kobo-transfer: install
+	$(VENV)/bin/python ./scripts/kobo/transfer.py \
 		--kobo-db $(KOBO_DB) \
-		--instance $(INSTANCE) \
 		--title $(TITLE) \
-		--shelf $(SHELF) \
 		$(if $(filter true,$(DRY_RUN)),--dry-run)
 
 .PHONY: shell
